@@ -10,27 +10,22 @@ The steps below come from reading fm1-base's tools and installer text. They have
 2. Use a USB **data** cable, plugged straight into the computer.
 3. Close every other program and browser tab that uses MIDI (DAWs, editors, other installers).
 
-## Get the firmware package
+## Get the install folder
 
 1. On GitHub, open the repository's **Actions** tab and pick the latest green **Build firmware** run.
-2. Under **Artifacts**, download `croc-o-synth-firmware` and unzip it. The file you need is `crocosynth.fwsc`.
+2. Under **Artifacts**, download `croc-o-synth-install` and unzip it. It holds the firmware (`crocosynth.fwsc`), the installer tool and a short READ-ME-FIRST.
 
-To make a fresh build, press **Run workflow** on the same page.
+To make a fresh build, press **Run workflow** on the same page. Git is not needed on the PC.
 
 ## Install
 
-One-time setup, in a terminal (PowerShell):
+Open PowerShell in the unzipped folder (Shift + right-click the folder, "Open PowerShell window here"). With the FM-1 switched on and running whatever firmware it has (no special mode):
 
-    git clone --recursive https://github.com/Goosegoosegoosegoosegoose/croc-o-synth
-    cd croc-o-synth
-    pip install mido python-rtmidi
+    py -m pip install mido python-rtmidi
+    py fm1_install.py --info
+    py fm1_install.py crocosynth.fwsc
 
-Then, with the FM-1 switched on and running whatever firmware it has (no special mode):
-
-    python base\tools\fm1_install.py --info
-    python base\tools\fm1_install.py path\to\crocosynth.fwsc
-
-`--info` only asks the FM-1 what it is; run it first to see that it is found. The install shows UPDATING and a bar on the FM-1, or a dark screen. Do not unplug or switch off until the tool says it is done. It can take several minutes.
+If `py` is not found, use the full path to `python.exe` in its place. `--info` only asks the FM-1 what it is; run it first to see that it is found. The install shows UPDATING and a bar on the FM-1, or a dark screen. Do not unplug or switch off until the tool says it is done. It can take several minutes.
 
 Expected afterwards: the name CROC-O-SYNTH, then "BEEN AWHILE, CROCO-DIAL!", then the home croc. Keys make sound; EDIT opens the Teeth lesson.
 

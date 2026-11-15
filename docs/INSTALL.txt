@@ -1,0 +1,24 @@
+CROC-O-SYNTH: installing on an FM-1 from Windows
+
+This folder has everything needed: the firmware (crocosynth.fwsc) and the installer tool
+(fm1_install.py and its two helper files, from fm1-base, MPL-2.0).
+
+Not yet tried on a real FM-1. Use a spare unit. Read docs/FLASHING.md in the repository
+for what to do if something goes wrong.
+
+1. Unzip this folder somewhere, for example Downloads\croc-o-synth-install.
+2. Close every other program and browser tab that uses MIDI.
+3. Plug the FM-1 into the computer with a USB data cable and switch it on.
+   Leave it running its normal firmware. No special mode.
+4. Open PowerShell in this folder (in File Explorer: Shift + right-click the folder,
+   "Open PowerShell window here") and run:
+
+       py -m pip install mido python-rtmidi
+       py fm1_install.py --info
+       py fm1_install.py crocosynth.fwsc
+
+   If "py" is not found, use the full path to python.exe in its place.
+
+5. Do not unplug or switch off until the tool says it is done. It can take several minutes.
+
+Afterwards the FM-1 shows CROC-O-SYNTH, then "BEEN AWHILE, CROCO-DIAL!", then the croc.

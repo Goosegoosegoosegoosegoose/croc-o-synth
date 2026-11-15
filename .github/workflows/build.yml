@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['app/**', 'base', 'build.sh', 'tests/**', '.github/workflows/build.yml']
+    paths: ['app/**', 'base', 'build.sh', 'tests/**', 'docs/INSTALL.txt', '.github/workflows/build.yml']
 
 permissions:
   contents: read
@@ -57,10 +57,16 @@ jobs:
       - name: Build the package
         run: ./build.sh
 
+      - name: Put the package and the installer tool in one folder
+        run: |
+          mkdir -p dist
+          cp app/build/crocosynth.fwsc dist/
+          cp base/tools/fm1_install.py base/tools/fm1ports.py base/tools/fm1_resources.py dist/
+          cp base/LICENSE dist/LICENSE-installer-MPL-2.0.txt
+          cp docs/INSTALL.txt dist/READ-ME-FIRST.txt
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
-          name: croc-o-synth-firmware
-          path: |
-            app/build/*.fwsc
-            app/build/*.bin
+          name: croc-o-synth-install
+          path: dist/
           if-no-files-found: error
