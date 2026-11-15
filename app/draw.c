@@ -302,7 +302,7 @@ static void scene(int32_t water_y)
     cv_rect(0, water_y, 240, 240 - water_y, K_WATER);
     cv_rect(0, water_y, 240, 3, K_FOAM);
 }
-static void panel(void)
+static void label_box(void)
 {
     m_reset();
     s_rrect(12.0f, 170.0f, 216.0f, 44.0f, 11.0f, K_INK);

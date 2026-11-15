@@ -6,7 +6,7 @@
 
 #define NV 4                             /* notes at once */
 #define NROW 3                           /* oscillators a note */
-#define FS 44100.0f
+#define SRATE 44100.0f
 
 typedef struct {
     int8_t teeth;                        /* 0 round (sine), 1 pointy (saw), 2 block (square) */
@@ -103,12 +103,12 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     int v, j;
     float gain = (float)master_q12 / 4096.0f * 8300000.0f * 0.6f;      /* MASTER, with a ceiling for small ears */
     float a = (float)s.atk / 10.0f;
-    float a_inc = 1.0f / ((0.005f + a * a * 0.8f) * FS);
-    float kd = 3.0f / ((0.05f + (float)s.dec / 10.0f * 0.8f) * FS);
-    float kr = 3.0f / ((0.05f + (float)s.rel / 10.0f * 1.5f) * FS);
+    float a_inc = 1.0f / ((0.005f + a * a * 0.8f) * SRATE);
+    float kd = 3.0f / ((0.05f + (float)s.dec / 10.0f * 0.8f) * SRATE);
+    float kr = 3.0f / ((0.05f + (float)s.rel / 10.0f * 1.5f) * SRATE);
     float sus = (float)s.sus / 10.0f;
     float fc = 200.0f * fm_powf(40.0f, (float)s.jaws / 12.0f);        /* 200 Hz closed .. 8 kHz wide open */
-    float g = fm_tanf(3.14159265f * fc / FS), k = 0.5f;
+    float g = fm_tanf(3.14159265f * fc / SRATE), k = 0.5f;
     float a1 = 1.0f / (1.0f + g * (g + k)), a2 = g * a1, a3 = g * a2;
     float lvl = WAVE_LEVEL[s.teeth] * ROW_LEVEL[s.rows - 1];
     midi_in();
@@ -129,7 +129,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
             stage = 3;
         if (!stage)
             continue;
-        base = 440.0f * fm_exp2f((float)(vc->note - 69) / 12.0f - (float)s.size) / FS;
+        base = 440.0f * fm_exp2f((float)(vc->note - 69) / 12.0f - (float)s.size) / SRATE;
         for (j = 0; j < s.rows; j++)
             inc[j] = fm_minf(0.45f, base * fm_exp2f(row_cents(j, s.rows, CROOK_CENTS[s.crook]) / 1200.0f));
         for (i = 0; i < n; i++) {

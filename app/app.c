@@ -267,7 +267,7 @@ static void picture(float t)
         c.jaw = 0.2f;
         c.tail = fm_sinf(t * 4.0f) * 0.2f;
         croc_mid(150.0f - 8.0f * s, s, &c);
-        panel();
+        label_box();
         t_center(120, 184, NOTES[snd.size + 2], K_CREAM, 200, 0);
         return;
     }
@@ -286,7 +286,7 @@ static void picture(float t)
             r = 1.5f + (1.0f - p) * 2.5f;
             s_ellipse(162.0f + p * 56.0f, 134.0f - p * 26.0f * (0.4f + jw) + fm_sinf((float)i * 2.4f) * 16.0f * p, r, r, K_SUN);
         }
-        panel();
+        label_box();
         t_center(120, 184, snd.jaws < 4 ? "CLOSED: MUFFLED" : snd.jaws < 9 ? "HALF OPEN" : "WIDE OPEN: BRIGHT", K_CREAM, 200, 0);
         return;
     }
@@ -297,7 +297,7 @@ static void picture(float t)
         t_center(120, 8, "HELLO!", K_INK, 224, 2);
         c.jaw = (0.12f + 0.88f * (float)snd.jaws / 12.0f) * (0.25f + 0.75f * env_jaw(t));
         croc_draw(120.0f + 19.0f * s, 150.0f - 8.0f * s, s, &c);
-        panel();
+        label_box();
         t_center(120, 184, "MY CROC", K_BLUSH, 200, 0);
         strip(KN, ui.focus == F_TEETH ? 0 : -1);
         return;
@@ -315,7 +315,7 @@ static void picture(float t)
         m_reset();
         s_rrect(196.0f, 148.0f, 34.0f, 18.0f, 7.0f, K_SUN);
         cv_text(213 - text_w(&FONT_XS, XN[snd.rows - 1]) / 2, 150, &FONT_XS, XN[snd.rows - 1], K_INK);
-        panel();
+        label_box();
         if (snd.rows >= 3)
             wave_plot(snd.teeth, snd.crook * 3 + 2, K_GLOW2);
         if (snd.rows >= 2)
@@ -329,7 +329,7 @@ static void picture(float t)
     c.sleep = 1;
     croc_mid(140.0f, 0.85f, &c);
     t_center(196, 78, "ZZZ", K_CROCD, 80, 0);
-    panel();
+    label_box();
     t_center(120, 184, "COMING SOON", K_CREAM, 200, 0);
 }
 
