@@ -8,6 +8,12 @@
 2. Use a USB **data** cable, plugged straight into the computer.
 3. Close every other program and browser tab that uses MIDI (DAWs, editors, other installers).
 
+## The quick way: one double-click
+
+Put `tools/update-croc.bat` anywhere on the PC (the Desktop is fine). With the FM-1 plugged in and switched on, double-click it. It downloads the newest build from this repository's **latest** release, unpacks it beside itself, and runs the installer. It needs Python with `mido` and `python-rtmidi` (`py -m pip install mido python-rtmidi`, once).
+
+The rest of this page is the same thing by hand.
+
 ## Get the install folder
 
 1. On GitHub, open the repository's **Actions** tab and pick the latest green **Build firmware** run.

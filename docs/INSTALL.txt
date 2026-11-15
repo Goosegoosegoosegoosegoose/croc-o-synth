@@ -5,6 +5,10 @@ This folder has everything needed: the firmware (crocosynth.fwsc) and the instal
 
 Read docs/FLASHING.md in the repository for what to do if something goes wrong.
 
+The quick way: copy update-croc.bat from this folder to the Desktop. From then on,
+double-clicking it downloads the newest build and installs it. The steps below do the
+same thing by hand.
+
 1. Unzip this folder somewhere, for example Downloads\croc-o-synth-install.
 2. Close every other program and browser tab that uses MIDI.
 3. Plug the FM-1 into the computer with a USB data cable and switch it on.

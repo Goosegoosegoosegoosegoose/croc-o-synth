@@ -8,10 +8,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['app/**', 'base', 'build.sh', 'tests/**', 'docs/INSTALL.txt', '.github/workflows/build.yml']
+    paths: ['app/**', 'base', 'build.sh', 'tests/**', 'tools/**', 'docs/INSTALL.txt', '.github/workflows/build.yml']
 
 permissions:
-  contents: read
+  contents: write          # the "latest" release below
 
 jobs:
   build:
@@ -64,9 +64,27 @@ jobs:
           cp base/tools/fm1_install.py base/tools/fm1ports.py base/tools/fm1_resources.py dist/
           cp base/LICENSE dist/LICENSE-installer-MPL-2.0.txt
           cp docs/INSTALL.txt dist/READ-ME-FIRST.txt
+          cp tools/update-croc.bat dist/
+          printf '%s\n%s\n' "$(grep -o 'CROC_BUILD "[^"]*"' app/app.c | cut -d'"' -f2)" "commit $GITHUB_SHA" > dist/BUILD.txt
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: croc-o-synth-install
           path: dist/
           if-no-files-found: error
+
+      # The newest build as a release, so it can be fetched without signing in:
+      #   https://github.com/OWNER/REPO/releases/latest/download/croc-o-synth-install.zip
+      # tools/update-croc.bat on a Windows PC downloads that and installs it.
+      - name: Publish as the latest release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          (cd dist && zip -q -r ../croc-o-synth-install.zip .)
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest croc-o-synth-install.zip --target "$GITHUB_SHA" \
+            --title "Latest build: $(head -1 dist/BUILD.txt)" \
+            --notes "The newest Croc-O-Synth development build, replaced on every build. See CHANGELOG.md for what is in it."
+
