@@ -151,6 +151,99 @@ static int voices_sounding(void)
 
 static void midi_in(void);               /* platglue.c: notes that came in over USB or TRS play too */
 
+/* The keys' notes reach the voices through this queue, so every note-on and note-off happens in the audio interrupt
+ * (the keys, MIDI in and the lily pads would otherwise pick voices from two places at once). One writer: the main
+ * loop. One reader: the interrupt. A byte each: the note, with the top bit set for a note-on. */
+static volatile uint8_t evq[32];
+static volatile uint32_t ev_w, ev_r;
+static void key_event(int32_t note, int on)
+{
+    evq[ev_w & 31u] = (uint8_t)((uint32_t)note | (on ? 0x80u : 0u));
+    ev_w++;
+}
+static void key_events(void)
+{
+    while (ev_r != ev_w) {
+        uint8_t b = evq[ev_r & 31u];
+        ev_r++;
+        if (b & 0x80u)
+            note_on(b & 0x7F);
+        else
+            note_off(b & 0x7F);
+    }
+}
+
+/* --------------------------------------------------- the lily pads' clock --- */
+/* Eight steps, two to a beat. The main loop sets the pads and the speed; the interrupt counts frames and plays each
+ * pad's note as its step comes round (to the nearest audio block, 5.8 ms). Croc hops (the arpeggiator) is meant to
+ * run on this same clock. */
+#define SEQ_N 8
+typedef struct {
+    volatile int8_t note[SEQ_N];         /* each pad's MIDI note (a key's: 53..79), -1 an empty pad */
+    volatile uint8_t pads;               /* 2..8: how many pads the croc hops before going round again */
+    volatile uint8_t gate;               /* 0..4: how long each note lasts, tiny hops to sliding */
+    volatile uint8_t tempo;              /* 0..8: hop speed, 60 to 180 beats a minute */
+    volatile uint8_t playing;
+} seq_t;
+static seq_t seq;
+static volatile int8_t seq_step = -1;    /* the pad the croc is on (-1: not hopping), for the screen */
+static volatile int8_t seq_sounding = -1;   /* the note its pad is playing now (-1 none), for the keys' lights */
+static volatile uint32_t seq_pos, seq_len;  /* frames into this step, and a step's length */
+static uint32_t sq_count;
+static int32_t sq_gate_left;
+static int8_t sq_note = -1;
+static uint8_t sq_next, sq_was;
+static const float SEQ_GATE[5] = {0.25f, 0.45f, 0.65f, 0.85f, 0.98f};
+
+static void seq_tick(uint32_t n)             /* audio interrupt, once a block */
+{
+    uint32_t len;
+    if (!seq.playing) {
+        if (sq_was) {
+            if (sq_note >= 0)
+                note_off(sq_note);
+            sq_note = -1;
+            sq_was = 0;
+            seq_step = -1;
+            seq_sounding = -1;
+        }
+        return;
+    }
+    len = (uint32_t)(SRATE * 30.0f / (60.0f + 15.0f * (float)seq.tempo));
+    if (!sq_was) {                           /* PLAY: the first pad at once */
+        sq_was = 1;
+        sq_next = 0;
+        sq_count = len;
+    } else {
+        sq_count += n;
+    }
+    if (sq_note >= 0 && (sq_gate_left -= (int32_t)n) <= 0) {
+        note_off(sq_note);
+        sq_note = -1;
+        seq_sounding = -1;
+    }
+    if (sq_count >= len) {
+        uint8_t st = (uint8_t)(sq_next % (seq.pads ? seq.pads : 1u));
+        int8_t nt = seq.note[st];
+        sq_count -= len;
+        if (sq_count >= len)
+            sq_count = 0;
+        if (sq_note >= 0)
+            note_off(sq_note);
+        sq_note = -1;
+        if (nt >= 0) {
+            note_on(nt);
+            sq_note = nt;
+            sq_gate_left = (int32_t)((float)len * SEQ_GATE[seq.gate > 4 ? 4 : seq.gate]);
+        }
+        seq_sounding = sq_note;
+        seq_step = (int8_t)st;
+        sq_next = (uint8_t)(st + 1u);
+    }
+    seq_pos = sq_count;
+    seq_len = len;
+}
+
 static inline float polyblep(float t, float dt)
 {
     if (t < dt) {
@@ -204,10 +297,12 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float wet_t = (float)s.echo / 6.0f * 0.5f, fb_t = s.echo ? 0.25f + (float)s.echo * 0.05f : 0.0f;
     float dl_t = ECHO_SEC[s.echo_far] * SRATE, cave_t = (float)s.cave / 6.0f * 0.55f;
     midi_in();
+    key_events();
     if (n > APP_BLOCK)
         n = APP_BLOCK;
     if (!n)
         return;
+    seq_tick(n);
     inv_n = 1.0f / (float)n;
     if (!mix_init) {
         mix_init = 1;

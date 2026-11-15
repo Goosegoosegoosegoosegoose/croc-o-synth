@@ -56,7 +56,7 @@ Follow an existing one; the tail wag lesson (`PG_LFO`) is the fullest example.
 
 ### Saved settings
 
-`settings_t` in `app.c` is written to flash. If you add to `sound_t`, take the space from its `rsv` bytes so the record keeps its size, and give the new field a value that is valid when it reads as 0, or handle 0. If the record must change size, bump the magic and carry the old record over as `app_init` does for `settings_v2_t`; the croc's name must survive an update.
+`settings_t` in `app.c` is written to flash. It has spare bytes (`rsv`), and so does `sound_t`: take new fields from those so the record keeps its size, and make 0 a valid value for a new field, since older saves read as 0 there. If the record must change size, bump the magic and carry the old record over as `app_init` does for `settings_v2_t`; the croc's name must survive an update.
 
 ### The lights
 
@@ -90,6 +90,6 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 
 ### Notes for the two lessons
 
-**Safe swamp (SCL).** Only the keys in a scale are "safe". Ideas agreed so far: the safe keys glow; a happy scale and a spooky one (major and minor). To decide with the owner: which scales, whether the root can move, and what an unsafe key does (stay silent, or slide to the nearest safe note). The lights can show three levels, so safe keys can glow dimly, the home note a little brighter, and held keys fully.
+**Safe swamp (SCL).** Hooks are in place: `key_to_note()` in `app.c` is the one place a key becomes a note (return -1 for silence; each key remembers the note it started, so its note-off matches), and the saved record already has `scale`, `scale_home` and `scale_unsafe` (all 0 must mean every key as it is). Only the keys in a scale are "safe". Ideas agreed so far: the safe keys glow; a happy scale and a spooky one (major and minor). To decide with the owner: which scales, whether the root can move, and what an unsafe key does (stay silent, or slide to the nearest safe note). The lights can show three levels, so safe keys can glow dimly, the home note a little brighter, and held keys fully.
 
 **Croc hops (ARP).** Hold a few keys and the croc plays them one at a time: up, down, or random. It needs a clock; build 8 adds one for the sequencer, with the hop speed on the SELECT knob. Build on that clock, do not add a second one.

@@ -18,8 +18,28 @@
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
 #define NPRESET 5                        /* then one more: My Croc */
-#define SET_MAGIC 0x43524F33u            /* "CRO3": the saved record; another magic loads the defaults */
-#define SET_MAGIC_V2 0x43524F32u         /* "CRO2": builds 5 and 6, read once and carried over */
+#define SET_MAGIC 0x43524F34u            /* "CRO4": the saved record; another magic loads the defaults */
+typedef struct {
+    uint32_t magic;
+    sound_t mine;                        /* My Croc: the last sound she made herself */
+    uint8_t preset;                      /* 0..NPRESET-1 a ready-made sound, NPRESET My Croc */
+    char name[NAME_LEN + 1];             /* the croc's name, A-Z and spaces; empty: not named yet */
+    int8_t seq_note[SEQ_N];              /* the lily pads' notes (-1 empty) */
+    uint8_t seq_pads, seq_gate, seq_tempo;
+    uint8_t scale, scale_home, scale_unsafe;   /* safe swamp (the scale mode): 0, 0, 0 is every key as it is */
+    uint8_t arp;                         /* croc hops (the arpeggiator): 0 off */
+    uint8_t rsv[15];                     /* room for more: take from here, so the record keeps its size */
+} settings_t;
+/* older records, read once and carried over, so an update keeps the croc's name and her sound */
+#define SET_MAGIC_V3 0x43524F33u         /* "CRO3": build 7 */
+typedef struct {
+    uint32_t magic;
+    sound_t mine;
+    uint8_t preset;
+    char name[9];
+    uint8_t rsv[2];
+} settings_v3_t;
+#define SET_MAGIC_V2 0x43524F32u         /* "CRO2": builds 5 and 6 */
 typedef struct {
     uint32_t magic;
     int8_t s[12];                        /* that sound: teeth .. wag_to */
@@ -27,13 +47,6 @@ typedef struct {
     char name[9];
     uint8_t rsv[2];
 } settings_v2_t;
-typedef struct {
-    uint32_t magic;
-    sound_t mine;                        /* My Croc: the last sound she made herself */
-    uint8_t preset;                      /* 0..NPRESET-1 a ready-made sound, NPRESET My Croc */
-    char name[NAME_LEN + 1];             /* the croc's name, A-Z and spaces; empty: not named yet */
-    uint8_t rsv[2];
-} settings_t;
 static settings_t set;
 static uint32_t dirty_at;                /* something changed at this time and is not saved yet (0: saved) */
 
@@ -62,40 +75,76 @@ static int name_ok(const char *n)
     return n[i] == 0;
 }
 
+static const int8_t SEQ_FIRST[SEQ_N] = {60, 64, 67, 64, 60, 64, 67, 72};   /* a little tune to start from */
+
+static void seq_from_settings(void)          /* the saved pads and speed into the clock's copy */
+{
+    int i;
+    for (i = 0; i < SEQ_N; i++)
+        seq.note[i] = set.seq_note[i];
+    seq.pads = set.seq_pads;
+    seq.gate = set.seq_gate;
+    seq.tempo = set.seq_tempo;
+}
+
 void app_init(void)
 {
     static union {
         settings_t now;
+        settings_v3_t v3;
         settings_v2_t v2;
     } ld;
-    int n = plat_store_load(OBJ_SETTINGS, &ld, sizeof ld), i, ok = 0;
+    int n = plat_store_load(OBJ_SETTINGS, &ld, sizeof ld), i, ok = 0, old = 0;
     fx_clear();
+    for (i = 0; i < (int)sizeof set; i++)
+        ((uint8_t *)&set)[i] = 0;
+    for (i = 0; i < SEQ_N; i++)
+        set.seq_note[i] = SEQ_FIRST[i];
+    set.seq_pads = SEQ_N;
+    set.seq_gate = 2;
+    set.seq_tempo = 3;
+    set.mine = PRESET[0];
     if (n == (int)sizeof(settings_t) && ld.now.magic == SET_MAGIC) {
         set = ld.now;
         ok = 1;
-    } else if (n == (int)sizeof(settings_v2_t) && ld.v2.magic == SET_MAGIC_V2) {   /* builds 5 and 6: her name and
-                                                                                    * her sound come along */
+    } else if (n == (int)sizeof(settings_v3_t) && ld.v3.magic == SET_MAGIC_V3) {   /* build 7 */
+        set.mine = ld.v3.mine;
+        set.preset = ld.v3.preset;
+        for (i = 0; i < NAME_LEN; i++)
+            set.name[i] = ld.v3.name[i];
+        ok = old = 1;
+    } else if (n == (int)sizeof(settings_v2_t) && ld.v2.magic == SET_MAGIC_V2) {   /* builds 5 and 6 */
         int8_t *d = (int8_t *)&set.mine;
-        set.mine = PRESET[0];
         for (i = 0; i < 12; i++)
             d[i] = ld.v2.s[i];
         set.mine.echo = 0;
         set.mine.echo_far = 2;
         set.mine.cave = 0;
         set.preset = ld.v2.preset;
-        for (i = 0; i <= NAME_LEN; i++)
+        for (i = 0; i < NAME_LEN; i++)
             set.name[i] = ld.v2.name[i];
-        set.name[NAME_LEN] = 0;
-        ok = 1;
-        dirty_at = 1u;                       /* saved again in the new form */
+        ok = old = 1;
     }
-    if (!ok || !sound_ok(&set.mine) || set.preset > NPRESET || !name_ok(set.name)) {
+    for (i = 0; i < SEQ_N && ok; i++)
+        if (set.seq_note[i] < -1 || (set.seq_note[i] >= 0 && (set.seq_note[i] < 53 || set.seq_note[i] > 79)))
+            ok = 0;
+    if (!ok || !sound_ok(&set.mine) || set.preset > NPRESET || !name_ok(set.name) || set.seq_pads < 2 ||
+        set.seq_pads > SEQ_N || set.seq_gate > 4 || set.seq_tempo > 8) {
         set.mine = PRESET[0];
         set.preset = 0;
         for (i = 0; i <= NAME_LEN; i++)
             set.name[i] = 0;
+        for (i = 0; i < SEQ_N; i++)
+            set.seq_note[i] = SEQ_FIRST[i];
+        set.seq_pads = SEQ_N;
+        set.seq_gate = 2;
+        set.seq_tempo = 3;
+        set.scale = set.scale_home = set.scale_unsafe = set.arp = 0;
     }
     set.magic = SET_MAGIC;
+    if (old)
+        dirty_at = 1u;                       /* saved again in the new form */
+    seq_from_settings();
     snd = set.preset < NPRESET ? PRESET[set.preset] : set.mine;
 }
 
@@ -111,12 +160,16 @@ static struct {
     uint32_t t0;                         /* when this mode began */
     uint32_t ov_until, home_t, glo_t, last_draw, last_touch;
     uint32_t keys, btn;
+    uint8_t key_note[NKEYS];             /* the note each held key started (its note-off must match) */
     uint8_t letter[NAME_LEN];            /* the name being spelled: 0 a space, 1..26 A..Z */
     uint8_t ncur;
 } ui;
 
 static const char *const SOON_NAME[NB] = {"", "SAFE SWAMP", "", "", "", "", "", "SAVE", "CROC HOPS",
                                           "LILY PAD STEPS", "PLAY", "CROC REMEMBERS", "", ""};
+
+/* The note a key plays: key 0 is F3 (MIDI 53). -1: the key stays silent. Safe swamp (the scale mode) changes this. */
+static int32_t key_to_note(uint32_t k) { return 53 + (int32_t)k; }
 
 void app_say(const char *a, const char *b)
 {
@@ -250,15 +303,19 @@ static void input(void)
         plat_leds(0, 0);
         return;
     }
-    for (k = 0; k < NKEYS; k++) {            /* key 0 is F3 (MIDI 53) */
+    for (k = 0; k < NKEYS; k++) {
         uint32_t bit = 1u << k;
-        int32_t note = 53 + (int32_t)k;
         if (key_dn & bit) {
-            note_on(note);
-            key_midi(note, 1);
-        } else if (!(keys & bit) && (ui.keys & bit)) {
-            note_off(note);
-            key_midi(note, 0);
+            int32_t note = key_to_note(k);
+            ui.key_note[k] = note < 0 ? 0 : (uint8_t)note;
+            if (note >= 0) {
+                key_event(note, 1);
+                key_midi(note, 1);
+            }
+        } else if (!(keys & bit) && (ui.keys & bit) && ui.key_note[k]) {
+            key_event(ui.key_note[k], 0);
+            key_midi(ui.key_note[k], 0);
+            ui.key_note[k] = 0;
         }
     }
     for (k = 0; k < NB; k++) {
