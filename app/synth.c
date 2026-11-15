@@ -15,6 +15,9 @@ typedef struct {
     int8_t size;                         /* -1 small, 0 croc, 1 big: a bigger croc sings an octave lower */
     int8_t jaws;                         /* 0..12: the filter, closed to wide open */
     int8_t atk, dec, sus, rel;           /* 0..10 each: open, relax, hold, close */
+    int8_t wag;                          /* 0 still, 1..8: the tail wag's speed (the LFO) */
+    int8_t wag_size;                     /* 0..4: how far it wags */
+    int8_t wag_to;                       /* 0 the voice (pitch), 1 the jaws (filter) */
 } sound_t;
 static sound_t snd;
 
@@ -106,6 +109,9 @@ static float hp_ic1, hp_ic2;
 /* what the mix is made of, kept from block to block: a change of rows or teeth fades over one block (5.8 ms)
  * instead of jumping, which crackled on the FM-1 */
 static float row_g[NROW], wave_w[3], norm_now, fc_now, lim_pk;
+static float lfo_ph, lfo_prev, pm_prev = 1.0f;
+static const float WAG_PITCH[5] = {8.0f, 18.0f, 35.0f, 60.0f, 100.0f};      /* cents each way */
+static const float WAG_JAWS[5] = {200.0f, 500.0f, 900.0f, 1500.0f, 2400.0f};
 static int8_t rows_prev = 1;
 static uint8_t mix_init;
 
@@ -126,6 +132,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float h1 = 1.0f / (1.0f + hg * (hg + hk)), h2 = hg * h1, h3 = hg * h2;
     float rg0[NROW], rg1[NROW], ww0[3], ww1[3];
     int act[NROW], wact[3];
+    float lfo0 = lfo_prev, lfo1, pm0 = pm_prev, pm1, jw_cents;
     midi_in();
     if (n > APP_BLOCK)
         n = APP_BLOCK;
@@ -155,10 +162,13 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     norm0 = norm_now;
     norm1 = ROW_LEVEL[s.rows - 1];
     fc_now += (fc - fc_now) * 0.4f;          /* the jaws glide: no steps in the filter */
-    g = fm_tanf(3.14159265f * fc_now / SRATE);
-    a1 = 1.0f / (1.0f + g * (g + k));
-    a2 = g * a1;
-    a3 = g * a2;
+    /* the tail wag: one slow sine, on the voice's pitch or on the jaws */
+    lfo_ph += (s.wag ? 1.0f + (float)s.wag * 0.9f : 0.0f) * (float)n / SRATE;
+    lfo_ph -= fm_floorf(lfo_ph);
+    lfo1 = s.wag ? fm_sin_turns(lfo_ph) : 0.0f;
+    pm1 = s.wag && s.wag_to == 0 ? fm_exp2f(lfo1 * WAG_PITCH[s.wag_size] / 1200.0f) : 1.0f;
+    jw_cents = s.wag && s.wag_to == 1 ? WAG_JAWS[s.wag_size] : 0.0f;
+    g = a1 = a2 = a3 = 0.0f;
     for (i = 0; i < n; i++)
         mixbuf[i] = 0.0f;
     for (v = 0; v < NV; v++) {
@@ -208,7 +218,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
                 float ph, w = 0.0f;
                 if (!act[j])
                     continue;
-                ph = vc->ph[j] + inc[j];
+                ph = vc->ph[j] + inc[j] * (pm0 + (pm1 - pm0) * f);
                 if (ph >= 1.0f)
                     ph -= 1.0f;
                 vc->ph[j] = ph;
@@ -239,9 +249,21 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         wave_w[kk] = ww1[kk];
     norm_now = norm1;
     rows_prev = s.rows;
+    lfo_prev = lfo1;
+    pm_prev = pm1;
     for (i = 0; i < n; i++) {                /* the jaws: a two-pole low-pass; then a limiter, so chords stay clean */
-        float v0 = mixbuf[i], v3 = v0 - flt_ic2;
-        float v1 = a1 * flt_ic1 + a2 * v3, v2 = flt_ic2 + a2 * flt_ic1 + a3 * v3, out, av;
+        float v0 = mixbuf[i], v1, v2, v3, out, av;
+        if ((i & 31u) == 0u) {               /* the filter's setting, every 32 frames: a wobbling jaw has no steps */
+            float lf = lfo0 + (lfo1 - lfo0) * (float)i * inv_n;
+            float fw = fm_clampf(fc_now * fm_exp2f(lf * jw_cents / 1200.0f), 60.0f, 12000.0f);
+            g = fm_tanf(3.14159265f * fw / SRATE);
+            a1 = 1.0f / (1.0f + g * (g + k));
+            a2 = g * a1;
+            a3 = g * a2;
+        }
+        v3 = v0 - flt_ic2;
+        v1 = a1 * flt_ic1 + a2 * v3;
+        v2 = flt_ic2 + a2 * flt_ic1 + a3 * v3;
         flt_ic1 = 2.0f * v1 - flt_ic1;
         flt_ic2 = 2.0f * v2 - flt_ic2;
         {                                    /* a high-pass under the speaker's range (lower with headphones) */

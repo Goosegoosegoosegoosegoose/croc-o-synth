@@ -6,6 +6,21 @@ All of these are development builds, so the FM-1 reports the same identity for e
 
 All dates are 2026-11-15.
 
+## Build 5: envelope, tail wag, presets, the croc's name
+
+- Commit: the one that adds this entry. Download: the matching **Build firmware** run on the Actions tab.
+- **Added:**
+  - **ENV**, snap or yawn: Open, Relax, Hold, Close on knobs 1 to 4, each with a line saying what it does and where it is set; the shape of one note at the bottom, with the part being turned lit
+  - **LFO**, tail wag: speed, size, and what wags (the voice or the jaws)
+  - **PRESETS knob**: five ready-made sounds (Baby Croc, Swamp Bass, Chomper, Sleepy Yawn, Wiggle Tail), then My Croc. Changing any setting by hand makes the sound My Croc; the presets never overwrite it
+  - **Name your croc** on the first power-on (knob 1 the letter, knob 2 or a key the next spot, HOME when done). The name shows on the greeting, the home screen and the goodbye. Hold GLO to rename
+  - **GLO** shows the two hold actions
+  - HOME's knobs: 1 teeth, 2 snap (open and close together), 3 wag
+  - "BUILD 5" in the corner of the greeting, so the build in an FM-1 can be read off its screen
+- **Checked:** the simulator checks pass, now 60 of them, including naming, presets, and everything kept across a power cycle. Measured in the simulator: the wag moves the pitch by about a semitone each way at its largest, and on the jaws it sweeps the brightness without moving the pitch.
+- **Note:** the saved record changed, so the first start after installing asks for the croc's name and begins from Baby Croc.
+- **On the FM-1:** not reported yet.
+
 ## Build 4: three croc sizes
 
 - Commit `45d99db`. Download: [run 43717276242](https://github.com/Goosegoosegoosegoosegoose/croc-o-synth/actions/runs/43717276242)

@@ -5,9 +5,9 @@ A kid-friendly firmware idea for the M-VAVE FM-1 pocket synth: a crocodile teach
 This repository holds two things:
 
 - **`prototype/index.html`**: a click-through mock of the FM-1 panel in a browser, with a stand-in sound engine. This is where the lessons are designed.
-- **`app/`**: the real firmware, in C, built on [fm1-base](https://github.com/charlesvestal/fm1-base). It is early: the start-up greeting, the home croc, the Teeth lesson, the jaws, small and big croc, and the goodbye. It runs in fm1-base's simulator and builds for the FM-1. **It has not been run on a real FM-1 yet.**
+- **`app/`**: the real firmware, in C, built on [fm1-base](https://github.com/charlesvestal/fm1-base). So far: the greeting, the home croc, the Teeth, envelope and tail wag lessons, the jaws, three croc sizes, the presets with My Croc, the croc's name, and the goodbye. It runs in fm1-base's simulator and on a real FM-1.
 
-![The first firmware screens, from the simulator](docs/img/firmware-first-screens.png)
+![Firmware screens, from the simulator](docs/img/firmware-first-screens.png)
 
 ## Try the prototype
 
@@ -60,8 +60,7 @@ Each firmware build and what changed in it is listed in [CHANGELOG.md](CHANGELOG
 - SCL (safe swamp: scales), ARP (croc hops), REC (croc remembers), SAVE
 - Challenges and stars for each lesson
 - Final croc and background art (the current drawing is a placeholder)
-- In the firmware: every lesson except Teeth, the presets, the name screen, the sequencer
-- A first run on a real FM-1
+- In the firmware: swamp echo and cave, the lily pad sequencer
 
 ## What the firmware is built on
 

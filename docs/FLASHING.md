@@ -1,8 +1,6 @@
 # Putting Croc-O-Synth on an FM-1 (Windows)
 
-**Status: not yet tried on a real FM-1.** The firmware builds for the device and passes its checks in the simulator. The first install is itself the test. Use a spare unit.
-
-The steps below come from reading fm1-base's tools and installer text. They have not been run on Windows by this project yet; correct this page after the first install.
+**Status: these steps have been used on a real FM-1 from Windows** (2026-11-15, over the Melodee firmware). The recovery steps at the end have not been needed or tried.
 
 ## Before you start
 

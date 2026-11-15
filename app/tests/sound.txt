@@ -1,6 +1,8 @@
 # Croc-O-Synth's sound in the host simulator: one note in each tooth shape, then three crooked rows, then a chord.
 #   app/build/host/crocosynth_host app/tests/sound.txt app/build/host
 wait 3000
+tap HOME
+wait 100
 tap EDIT
 wav round.wav
 key 7 down
@@ -41,4 +43,21 @@ key 11 up
 key 14 up
 key 19 up
 wait 400
+wavstop
+# the tail wag on the voice, then on the jaws
+tap LFO
+turn K1 5
+turn K2 4
+wav wag-voice.wav
+key 7 down
+wait 1200
+key 7 up
+wait 300
+wavstop
+turn K3 1
+wav wag-jaws.wav
+key 7 down
+wait 1200
+key 7 up
+wait 300
 wavstop

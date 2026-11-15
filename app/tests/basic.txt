@@ -1,11 +1,30 @@
 # Croc-O-Synth in the host simulator: ./build.sh --host, then
 #   app/build/host/crocosynth_host app/tests/basic.txt app/build/host
+# modes: 0 greeting, 1 playing, 2 goodbye, 3 asleep, 4 naming. pages: 0 home, 1 teeth, 2 coming soon, 3 envelope,
+# 4 tail wag, 5 grown-ups
 wait 300
 expect mode 0
 shot boot.png
+# the first power-on: name the croc (Z, I, G)
 wait 2800
+expect mode 4
+turn K1 26
+turn K2 1
+turn K1 9
+key 3 down
+key 3 up
+turn K1 7
+wait 100
+shot name.png
+tap HOME
 expect mode 1
 expect page 0
+expect named 1
+expect name0 90
+expect name1 73
+expect name2 71
+expect name3 0
+wait 200
 shot home.png
 # a key plays, and stops
 key 7 down
@@ -18,7 +37,6 @@ expect voices 0
 tap EDIT
 wait 100
 expect page 1
-shot teeth-round.png
 turn K1 1
 expect teeth 1
 turn K2 2
@@ -29,36 +47,98 @@ wait 100
 shot teeth-rows.png
 turn K1 5
 expect teeth 2
+# changing the sound makes it My Croc
+expect preset 5
 # the jaws, on any page
 turn ALGO -6
 expect jaws 3
 wait 100
 shot jaws.png
-wait 2000
-# big croc
+# big croc is as far as it goes
+tap OCT-
 tap OCT-
 tap OCT-
 expect size 1
 wait 100
 shot size.png
-wait 2000
-# a lesson to come
+# snap or yawn: open, relax, hold, close
+tap ENV
+wait 100
+expect page 3
+shot env.png
+turn K1 6
+expect atk 6
+wait 100
+shot env-open.png
+turn K3 -2
+expect sus 5
+turn K4 5
+expect rel 7
+wait 100
+shot env-close.png
+# tail wag: speed, size, what
+tap LFO
+expect page 4
+turn K1 4
+expect wag 4
+turn K2 1
+expect wagsize 3
+turn K3 1
+expect wagto 1
+wait 100
+shot lfo.png
+# the ready-made sounds, and My Croc comes back
+turn PRESET -9
+expect preset 0
+expect page 0
+expect teeth 0
+expect atk 0
+wait 100
+shot preset.png
+turn PRESET 2
+expect preset 2
+expect jaws 10
+turn PRESET 9
+expect preset 5
+expect teeth 2
+expect atk 6
+expect wag 4
+# grown-ups, and a lesson to come
+tap GLO
+wait 100
+expect page 5
+shot glo.png
 tap SEQ
 wait 100
 expect page 2
 shot soon.png
-# the sound is kept across a power cycle
+# everything is kept across a power cycle
 tap HOME
 wait 3500
-expect store_writes 1
+expect store_writes >0
 reboot
 wait 3200
+expect mode 1
+expect named 1
+expect name0 90
+expect preset 5
 expect teeth 2
 expect rows 3
 expect size 1
 expect jaws 3
+expect atk 6
+expect wag 4
+expect wagto 1
 shot home-after.png
+# GLO held: rename; HOME finishes
+press GLO
+wait 1000
+expect mode 4
+release GLO
+tap HOME
+expect mode 1
 # HOME held: goodbye, then asleep, then a press wakes it
+wait 200
 press HOME
 wait 1000
 expect mode 2
@@ -67,7 +147,6 @@ wait 300
 shot bye.png
 wait 5000
 expect mode 3
-shot off.png
 tap PLAY
 wait 100
 expect mode 0

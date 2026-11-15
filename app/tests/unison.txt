@@ -2,6 +2,8 @@
 # when the rows change under a held note. Records both for measuring.
 #   app/build/host/crocosynth_host app/tests/unison.txt app/build/host
 wait 3000
+tap HOME
+wait 100
 tap EDIT
 turn K2 1
 wav taps.wav

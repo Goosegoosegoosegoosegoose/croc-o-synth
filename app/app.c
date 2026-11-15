@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
  * Copyright 2026 goose */
-/* Croc-O-Synth: a crocodile teaches synth basics, one lesson a button. This first firmware has the start-up
- * greeting, the home croc that wears every setting, the Teeth lesson (EDIT), the jaws (ALGORITHM), small and big croc
- * (OCT), the goodbye (HOME held), and a placeholder for the lessons to come.
+/* Croc-O-Synth: a crocodile teaches synth basics, one lesson a button.
+ *   HOME       the croc, wearing the sound          EDIT   teeth: shape, rows, crooked
+ *   ENV        snap or yawn: open, relax, hold, close      LFO    tail wag: speed, size, what
+ *   PRESETS    five sounds and My Croc              ALGORITHM   the jaws, on every page
+ *   OCT- OCT+  big croc, croc, small croc           HOME held: goodbye      GLO held: name the croc
  * Part of the platform's unity build (base/device/unity.c, base/host/plat_host.c), after the platform: gfx.c and
  * announce.c are in scope. Written against the contract in app.h; see PROVENANCE.md for what came from where. */
 #include "fastmath.h"
@@ -10,59 +12,78 @@
 #include "platglue.c"
 #include "draw.c"
 
+#define CROC_BUILD "BUILD 5"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+
 /* --------------------------------------------------------------- settings --- */
-#define SET_MAGIC 0x43524F31u            /* "CRO1": the saved sound; another magic loads the defaults */
+#define NAME_LEN 8
+#define NPRESET 5                        /* then one more: My Croc */
+#define SET_MAGIC 0x43524F32u            /* "CRO2": the saved record; another magic loads the defaults */
 typedef struct {
     uint32_t magic;
-    sound_t s;
-    uint8_t rsv[3];
+    sound_t mine;                        /* My Croc: the last sound she made herself */
+    uint8_t preset;                      /* 0..NPRESET-1 a ready-made sound, NPRESET My Croc */
+    char name[NAME_LEN + 1];             /* the croc's name, A-Z and spaces; empty: not named yet */
+    uint8_t rsv[2];
 } settings_t;
 static settings_t set;
-static uint32_t dirty_at;                /* the sound changed at this time and is not saved yet (0: saved) */
+static uint32_t dirty_at;                /* something changed at this time and is not saved yet (0: saved) */
 
-static void sound_defaults(void)
-{
-    snd.teeth = 0;
-    snd.rows = 1;
-    snd.crook = 2;
-    snd.size = 0;
-    snd.jaws = 9;
-    snd.atk = 0;
-    snd.dec = 4;
-    snd.sus = 7;
-    snd.rel = 2;
-}
+static const char *const PRESET_NAME[NPRESET] = {"BABY CROC", "SWAMP BASS", "CHOMPER", "SLEEPY YAWN", "WIGGLE TAIL"};
+/*                                      teeth rows crook size jaws  atk dec sus rel  wag size to */
+static const sound_t PRESET[NPRESET] = {{0, 1, 2, -1, 9, 0, 4, 7, 2, 0, 2, 0},
+                                        {2, 2, 1, 1, 4, 0, 5, 6, 2, 0, 2, 0},
+                                        {1, 1, 2, 0, 10, 0, 2, 2, 1, 0, 2, 0},
+                                        {0, 3, 2, 0, 5, 8, 5, 8, 8, 2, 1, 0},
+                                        {1, 1, 2, -1, 7, 1, 4, 7, 3, 6, 3, 1}};
+
 static int sound_ok(const sound_t *s)
 {
     return s->teeth >= 0 && s->teeth <= 2 && s->rows >= 1 && s->rows <= 3 && s->crook >= 0 && s->crook <= 4 &&
            s->size >= -1 && s->size <= 1 && s->jaws >= 0 && s->jaws <= 12 && s->atk >= 0 && s->atk <= 10 &&
-           s->dec >= 0 && s->dec <= 10 && s->sus >= 0 && s->sus <= 10 && s->rel >= 0 && s->rel <= 10;
+           s->dec >= 0 && s->dec <= 10 && s->sus >= 0 && s->sus <= 10 && s->rel >= 0 && s->rel <= 10 &&
+           s->wag >= 0 && s->wag <= 8 && s->wag_size >= 0 && s->wag_size <= 4 && s->wag_to >= 0 && s->wag_to <= 1;
+}
+static int name_ok(const char *n)
+{
+    int i;
+    for (i = 0; i < NAME_LEN && n[i]; i++)
+        if (!((n[i] >= 'A' && n[i] <= 'Z') || n[i] == ' '))
+            return 0;
+    return n[i] == 0;
 }
 
 void app_init(void)
 {
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) == (int)sizeof set && set.magic == SET_MAGIC && sound_ok(&set.s))
-        snd = set.s;
-    else
-        sound_defaults();
+    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC ||
+        !sound_ok(&set.mine) || set.preset > NPRESET || !name_ok(set.name)) {
+        int i;
+        set.magic = SET_MAGIC;
+        set.mine = PRESET[0];
+        set.preset = 0;
+        for (i = 0; i <= NAME_LEN; i++)
+            set.name[i] = 0;
+    }
+    snd = set.preset < NPRESET ? PRESET[set.preset] : set.mine;
 }
 
 /* --------------------------------------------------------------------- UI --- */
-enum { M_BOOT, M_PLAY, M_BYE, M_OFF };
-enum { PG_HOME, PG_EDIT, PG_SOON };
+enum { M_BOOT, M_PLAY, M_BYE, M_OFF, M_NAME };
+enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO };
 enum { OV_NONE, OV_SIZE, OV_JAWS };
-enum { F_NONE = -1, F_TEETH, F_ROWS, F_CROOK };
+enum { F_NONE = -1, F_K1, F_K2, F_K3, F_K4 };   /* which of KNOB 1 to 4 was turned last on this page */
 
 static struct {
     uint8_t mode, page, ov, soon;        /* soon: the button whose lesson is still to come */
-    int8_t focus;                        /* the knob turned last on this page (F_*) */
+    int8_t focus;
     uint32_t t0;                         /* when this mode began */
-    uint32_t ov_until, home_t, last_draw, last_touch;
+    uint32_t ov_until, home_t, glo_t, last_draw, last_touch;
     uint32_t keys, btn;
+    uint8_t letter[NAME_LEN];            /* the name being spelled: 0 a space, 1..26 A..Z */
+    uint8_t ncur;
 } ui;
 
-static const char *const SOON_NAME[NB] = {"SWAMP ECHO", "SAFE SWAMP", "SNAP OR YAWN", "TAIL WAG", "", "GROWN-UPS", "",
-                                          "SAVE", "CROC HOPS", "LILY PAD STEPS", "PLAY", "CROC REMEMBERS", "", ""};
+static const char *const SOON_NAME[NB] = {"SWAMP ECHO", "SAFE SWAMP", "", "", "", "", "", "SAVE", "CROC HOPS",
+                                          "LILY PAD STEPS", "PLAY", "CROC REMEMBERS", "", ""};
 
 void app_say(const char *a, const char *b)
 {
@@ -70,15 +91,31 @@ void app_say(const char *a, const char *b)
         ann_say(a ? a : "", b && b[0] ? b : 0, ANN_NOW);
 }
 
+static void text_join(char *d, const char *a, const char *b, const char *c)
+{
+    while (*a)
+        *d++ = *a++;
+    while (*b)
+        *d++ = *b++;
+    while (*c)
+        *d++ = *c++;
+    *d = 0;
+}
+
+static void touched(void) { dirty_at = plat_ms() | 1u; }
+/* she changed the sound herself: it becomes My Croc */
 static void changed(void)
 {
-    dirty_at = plat_ms() | 1u;
+    set.mine = snd;
+    set.preset = NPRESET;
+    touched();
 }
 static void set_mode(int m)
 {
     ui.mode = (uint8_t)m;
     ui.t0 = plat_ms();
     ui.ov = OV_NONE;
+    ui.home_t = ui.glo_t = 0;
     if (m != M_PLAY)
         notes_off();
 }
@@ -95,10 +132,51 @@ static void overlay(int o)
     ui.ov = (uint8_t)o;
     ui.ov_until = plat_ms() + 1800u;
 }
+static void go_page(int p)
+{
+    ui.page = (uint8_t)p;
+    ui.focus = F_NONE;
+}
+
+static void naming_start(void)
+{
+    int i, end = 0;
+    for (i = 0; i < NAME_LEN; i++) {
+        char c = end ? 0 : set.name[i];
+        if (!c)
+            end = 1;
+        ui.letter[i] = c >= 'A' && c <= 'Z' ? (uint8_t)(c - 'A' + 1) : 0;
+    }
+    ui.ncur = 0;
+    set_mode(M_NAME);
+}
+static void naming_done(void)
+{
+    int i, n = 0, last = -1;
+    for (i = 0; i < NAME_LEN; i++)
+        if (ui.letter[i])
+            last = i;
+    for (i = 0; i <= last; i++)              /* leading spaces dropped, the rest as spelled */
+        if (n || ui.letter[i])
+            set.name[n++] = ui.letter[i] ? (char)('A' + ui.letter[i] - 1) : ' ';
+    if (!n) {                                /* nothing spelled: plain CROC */
+        set.name[0] = 'C';
+        set.name[1] = 'R';
+        set.name[2] = 'O';
+        set.name[3] = 'C';
+        n = 4;
+    }
+    for (; n <= NAME_LEN; n++)
+        set.name[n] = 0;
+    touched();
+    go_page(PG_HOME);
+    set_mode(M_PLAY);
+}
 
 static void input(void)
 {
     uint32_t keys = plat_keys(), btn = plat_buttons(), k, now = plat_ms();
+    uint32_t key_dn = keys & ~ui.keys, btn_dn = btn & ~ui.btn;
     int32_t e[NE];
     int any = keys != ui.keys || btn != ui.btn;
     for (k = 0; k < NE; k++) {
@@ -107,10 +185,33 @@ static void input(void)
     }
     if (any)
         ui.last_touch = now;
+    if (ui.mode == M_NAME) {                 /* KNOB 1 the letter, KNOB 2 or a key the next spot, HOME done */
+        if (e[EN_K1])
+            ui.letter[ui.ncur] = (uint8_t)(((int32_t)ui.letter[ui.ncur] + e[EN_K1] % 27 + 27) % 27);
+        if (e[EN_K2])
+            ui.ncur = (uint8_t)clamp((int32_t)ui.ncur + e[EN_K2], 0, NAME_LEN - 1);
+        if (key_dn && ui.ncur < NAME_LEN - 1)
+            ui.ncur++;
+        ui.keys = keys;
+        ui.btn = btn;
+        plat_glow(1);
+        plat_leds(1u << B_HOME, 0);
+        if (btn_dn >> B_HOME & 1u)
+            naming_done();
+        return;
+    }
     if (ui.mode != M_PLAY) {
         /* the greeting ends at any touch; the goodbye and the sleeping croc wake at a new press */
-        if (ui.mode == M_BOOT ? any && now - ui.t0 > 400u : (keys & ~ui.keys) || (btn & ~ui.btn))
-            set_mode(ui.mode == M_BOOT ? M_PLAY : M_BOOT);
+        if (ui.mode == M_BOOT) {
+            if (any && now - ui.t0 > 400u) {
+                if (set.name[0])
+                    set_mode(M_PLAY);
+                else
+                    naming_start();
+            }
+        } else if (key_dn || btn_dn) {
+            set_mode(M_BOOT);
+        }
         ui.keys = keys;
         ui.btn = btn;
         plat_leds(0, 0);
@@ -119,7 +220,7 @@ static void input(void)
     for (k = 0; k < NKEYS; k++) {            /* key 0 is F3 (MIDI 53) */
         uint32_t bit = 1u << k;
         int32_t note = 53 + (int32_t)k;
-        if ((keys & bit) && !(ui.keys & bit)) {
+        if (key_dn & bit) {
             note_on(note);
             key_midi(note, 1);
         } else if (!(keys & bit) && (ui.keys & bit)) {
@@ -128,22 +229,26 @@ static void input(void)
         }
     }
     for (k = 0; k < NB; k++) {
-        uint32_t bit = 1u << k;
-        if (!(btn & bit) || (ui.btn & bit))
+        if (!(btn_dn >> k & 1u))
             continue;
         ui.ov = OV_NONE;
         if (k == B_OCTDN || k == B_OCTUP) {  /* OCT- : a bigger croc, lower notes */
             step(&snd.size, k == B_OCTDN ? 1 : -1, -1, 1);
             overlay(OV_SIZE);
         } else if (k == B_HOME) {
-            ui.page = PG_HOME;
-            ui.focus = F_NONE;
+            go_page(PG_HOME);
             ui.home_t = now | 1u;
         } else if (k == B_EDIT) {
-            ui.page = PG_EDIT;
-            ui.focus = F_NONE;
+            go_page(PG_EDIT);
+        } else if (k == B_ENV) {
+            go_page(PG_ENV);
+        } else if (k == B_LFO) {
+            go_page(PG_LFO);
+        } else if (k == B_GLO) {
+            go_page(PG_GLO);
+            ui.glo_t = now | 1u;
         } else if (k != B_PLAY) {
-            ui.page = PG_SOON;
+            go_page(PG_SOON);
             ui.soon = (uint8_t)k;
         }
     }
@@ -151,37 +256,81 @@ static void input(void)
         if (!(btn >> B_HOME & 1u)) {
             ui.home_t = 0;
         } else if (now - ui.home_t >= 900u) {
-            ui.home_t = 0;
             set_mode(M_BYE);
         }
     }
-    if (e[EN_ALGO]) {                        /* the jaws, on every page */
-        step(&snd.jaws, e[EN_ALGO], 0, 12);
-        overlay(OV_JAWS);
-    }
-    if (ui.page == PG_EDIT || ui.page == PG_HOME) {
-        if (e[EN_K1]) {
-            step(&snd.teeth, e[EN_K1], 0, 2);
-            ui.focus = F_TEETH;
-            ui.ov = OV_NONE;
+    if (ui.glo_t) {                          /* GLO held: name the croc */
+        if (!(btn >> B_GLO & 1u)) {
+            ui.glo_t = 0;
+        } else if (now - ui.glo_t >= 900u) {
+            naming_start();
         }
     }
-    if (ui.page == PG_EDIT) {
-        if (e[EN_K2]) {
-            step(&snd.rows, e[EN_K2], 1, 3);
-            ui.focus = F_ROWS;
+    if (ui.mode == M_PLAY) {
+        if (e[EN_ALGO]) {                    /* the jaws, on every page */
+            step(&snd.jaws, e[EN_ALGO], 0, 12);
+            overlay(OV_JAWS);
+        }
+        if (e[EN_PRESET]) {                  /* the ready-made sounds, then My Croc */
+            int32_t p = clamp((int32_t)set.preset + e[EN_PRESET], 0, NPRESET);
+            if (p != set.preset) {
+                set.preset = (uint8_t)p;
+                snd = p < NPRESET ? PRESET[p] : set.mine;
+                touched();
+            }
+            go_page(PG_HOME);
             ui.ov = OV_NONE;
         }
-        if (e[EN_K3]) {
-            step(&snd.crook, e[EN_K3], 0, 4);
-            ui.focus = F_CROOK;
-            ui.ov = OV_NONE;
+        for (k = 0; k < 4; k++) {            /* KNOB 1 to 4: this page's four settings */
+            int32_t d = e[EN_K1 + k];
+            int used = 1;
+            if (!d)
+                continue;
+            if (ui.page == PG_HOME) {
+                if (k == 0) {
+                    step(&snd.teeth, d, 0, 2);
+                } else if (k == 1) {         /* snap or yawn: open and close together */
+                    step(&snd.atk, d, 0, 10);
+                    step(&snd.rel, d, 0, 10);
+                } else if (k == 2) {
+                    step(&snd.wag, d, 0, 8);
+                } else {
+                    used = 0;
+                }
+            } else if (ui.page == PG_EDIT) {
+                if (k == 0)
+                    step(&snd.teeth, d, 0, 2);
+                else if (k == 1)
+                    step(&snd.rows, d, 1, 3);
+                else if (k == 2)
+                    step(&snd.crook, d, 0, 4);
+                else
+                    used = 0;
+            } else if (ui.page == PG_ENV) {
+                step(k == 0 ? &snd.atk : k == 1 ? &snd.dec : k == 2 ? &snd.sus : &snd.rel, d, 0, 10);
+            } else if (ui.page == PG_LFO) {
+                if (k == 0)
+                    step(&snd.wag, d, 0, 8);
+                else if (k == 1)
+                    step(&snd.wag_size, d, 0, 4);
+                else if (k == 2)
+                    step(&snd.wag_to, d, 0, 1);
+                else
+                    used = 0;
+            } else {
+                used = 0;
+            }
+            if (used) {
+                ui.focus = (int8_t)k;
+                ui.ov = OV_NONE;
+            }
         }
     }
     ui.keys = keys;
     ui.btn = btn;
     plat_glow(1);
-    plat_leds(ui.page == PG_HOME ? 1u << B_HOME : ui.page == PG_EDIT ? 1u << B_EDIT : 1u << ui.soon, keys);
+    plat_leds(ui.page == PG_HOME ? 1u << B_HOME : ui.page == PG_EDIT ? 1u << B_EDIT : ui.page == PG_ENV ? 1u << B_ENV
+              : ui.page == PG_LFO ? 1u << B_LFO : ui.page == PG_GLO ? 1u << B_GLO : 1u << ui.soon, keys);
 }
 
 void app_input_only(void) { input(); }
@@ -205,6 +354,8 @@ static float env_jaw(float t)
         return s * (1.0f - ph / r);
     return 0.0f;
 }
+/* the tail wag as the sound has it: -1..1, still when the wag is off */
+static float wag_now(float t) { return snd.wag ? fm_sinf(t * 6.2831853f * (1.0f + (float)snd.wag * 0.9f)) : 0.0f; }
 
 static void croc_look(croc_t *c)             /* the croc as the sound has it */
 {
@@ -218,10 +369,39 @@ static void croc_look(croc_t *c)             /* the croc as the sound has it */
     c->wave_ph = 0.0f;
 }
 
+static void picture_name(float t)
+{
+    static const char *const LINE[3] = {"KNOB 1: PICK A LETTER", "KNOB 2 OR A KEY: NEXT SPOT", "PRESS HOME WHEN DONE"};
+    croc_t c;
+    int i;
+    scene(118);
+    t_center(120, 6, "NAME YOUR CROC", K_INK, 228, 1);
+    croc_look(&c);
+    c.teeth = 0;
+    c.rows = 1;
+    c.jaw = 0.3f + 0.1f * fm_sinf(t * 3.0f);
+    c.tail = fm_sinf(t * 5.0f) * 0.3f;
+    croc_mid(96.0f, 0.62f, &c);
+    m_reset();
+    for (i = 0; i < NAME_LEN; i++) {
+        float x0 = 13.5f + (float)i * 27.0f, lift = i == ui.ncur ? fm_fabsf(fm_sinf(t * 4.0f)) * 3.0f : 0.0f;
+        char ch[2];
+        ch[0] = ui.letter[i] ? (char)('A' + ui.letter[i] - 1) : ' ';
+        ch[1] = 0;
+        s_rrect(x0 - 2.0f, 132.0f - lift, 28.0f, 34.0f, 7.0f, i == ui.ncur ? K_MOUTH : K_INK);
+        s_rrect(x0, 134.0f - lift, 24.0f, 30.0f, 5.0f, K_CREAM);
+        cv_text((int32_t)x0 + 12 - text_w(&FONT_M, ch) / 2, 137 - (int32_t)lift, &FONT_M, ch, K_INK);
+    }
+    s_rrect(12.0f, 174.0f, 216.0f, 58.0f, 11.0f, K_INK);
+    for (i = 0; i < 3; i++)
+        t_small(120, 179 + i * 17, LINE[i], i == 2 ? K_SUN : K_CREAM);
+}
+
 /* the whole picture; called once a band, with the canvas clipped to that band's rows */
 static void picture(float t)
 {
     static const float SIZE_S[3] = {0.55f, 0.8f, 1.05f};
+    char buf[32];
     croc_t c;
     m_reset();
     croc_look(&c);
@@ -234,6 +414,13 @@ static void picture(float t)
         c.jaw = 0.35f + 0.15f * fm_sinf(t * 3.0f);
         c.tail = fm_sinf(t * 6.0f) * 0.35f;
         croc_mid(142.0f, 0.85f, &c);
+        m_reset();
+        if (set.name[0]) {
+            s_rrect(30.0f, 190.0f, 180.0f, 28.0f, 14.0f, K_INK);
+            text_join(buf, "I'M ", set.name, "!");
+            t_center(120, 196, buf, K_SUN, 164, 0);
+        }
+        cv_text(6, 226, &FONT_T, CROC_BUILD, RGB(46, 118, 130));
         return;
     }
     if (ui.mode == M_BYE) {
@@ -250,12 +437,20 @@ static void picture(float t)
         c.wave = 1;
         c.wave_ph = t * 7.0f;
         croc_mid(150.0f, 0.85f, &c);
+        if (set.name[0]) {
+            text_join(buf, "LOVE, ", set.name, "");
+            t_center(120, 204, buf, K_PALE, 200, 0);
+        }
         return;
     }
     if (ui.mode == M_OFF) {
         cv_rect(0, 0, 240, 240, K_OFF);
         t_center(176, 58, "ZZZ", K_OFFT, 100, 1);
         t_center(120, 198, "PRESS ANY KEY", K_OFFT, 200, 0);
+        return;
+    }
+    if (ui.mode == M_NAME) {
+        picture_name(t);
         return;
     }
     if (ui.ov == OV_SIZE) {
@@ -291,15 +486,23 @@ static void picture(float t)
         return;
     }
     if (ui.page == PG_HOME) {
-        static const char *const KN[4] = {"TEETH", 0, 0, 0};
-        float s = SIZE_S[snd.size + 1] * 0.93f;
+        static const char *const KN[4] = {"TEETH", "SNAP", "WAG", 0};
+        float s = SIZE_S[snd.size + 1] * 0.93f, w = wag_now(t);
         scene(150);
-        t_center(120, 8, "HELLO!", K_INK, 224, 2);
+        if (set.name[0])
+            text_join(buf, "HI, ", set.name, "!");
+        else
+            text_join(buf, "HELLO!", "", "");
+        t_center(120, 8, buf, K_INK, 224, 2);
         c.jaw = (0.12f + 0.88f * (float)snd.jaws / 12.0f) * (0.25f + 0.75f * env_jaw(t));
+        if (snd.wag_to)
+            c.jaw = fm_clampf(c.jaw + 0.15f * w * (0.3f + (float)snd.wag_size / 5.0f), 0.0f, 1.0f);
+        c.tail = w * 0.5f;
         croc_draw(120.0f + 19.0f * s, 150.0f - 8.0f * s, s, &c);
         label_box();
-        t_center(120, 184, "MY CROC", K_BLUSH, 200, 0);
-        strip(KN, ui.focus == F_TEETH ? 0 : -1);
+        t_center(120, 184, set.preset < NPRESET ? PRESET_NAME[set.preset] : "MY CROC", set.preset < NPRESET ? K_SUN : K_BLUSH,
+                 200, 0);
+        strip(KN, ui.focus);
         return;
     }
     if (ui.page == PG_EDIT) {
@@ -308,7 +511,7 @@ static void picture(float t)
         static const char *const ROWS[3] = {"ONE ROW OF TEETH", "TWO ROWS OF TEETH", "THREE ROWS OF TEETH"};
         static const char *const XN[3] = {"X1", "X2", "X3"};
         scene(166);
-        t_center(120, 8, ui.focus == F_ROWS ? ROWS[snd.rows - 1] : ui.focus == F_CROOK ? (snd.crook ? "CROOKED TEETH" : "STRAIGHT TEETH")
+        t_center(120, 8, ui.focus == F_K2 ? ROWS[snd.rows - 1] : ui.focus == F_K3 ? (snd.crook ? "CROOKED TEETH" : "STRAIGHT TEETH")
                              : TEETH[snd.teeth], K_INK, 228, 1);
         c.jaw = 0.62f;
         croc_draw(44.0f, 110.0f, 2.1f, &c);
@@ -322,6 +525,79 @@ static void picture(float t)
             wave_plot(snd.teeth, 64 - snd.crook * 3 - 2, K_GLOW2);
         wave_plot(snd.teeth, 0, K_GLOW);
         strip(KN, ui.focus);
+        return;
+    }
+    if (ui.page == PG_ENV) {
+        static const char *const KN[4] = {"OPEN", "RELAX", "HOLD", "CLOSE"};
+        static const char *const WHAT[4] = {"HOW FAST THE SOUND STARTS", "HOW FAST IT DROPS AFTER THE START",
+                                            "HOW LOUD IT STAYS AS YOU HOLD", "HOW LONG IT FADES AFTER YOU LET GO"};
+        int32_t avg = (snd.atk + snd.rel) / 2, px[5], py[5], i;
+        const char *now;
+        scene(150);
+        t_center(120, 4, ui.focus >= 0 ? KN[ui.focus] : avg <= 2 ? "SNAP!" : avg <= 5 ? "CHOMP" : "YAAAWN", K_INK, 224, 2);
+        if (ui.focus == F_K1)
+            now = snd.atk <= 1 ? "RIGHT AWAY" : snd.atk <= 5 ? "A LITTLE SLOW" : "VERY SLOW";
+        else if (ui.focus == F_K2)
+            now = snd.dec <= 2 ? "QUICK DROP" : snd.dec <= 6 ? "GENTLE DROP" : "SLOW DROP";
+        else if (ui.focus == F_K3)
+            now = snd.sus == 0 ? "SILENT" : snd.sus <= 3 ? "QUIET" : snd.sus <= 7 ? "MEDIUM" : "LOUD";
+        else if (ui.focus == F_K4)
+            now = snd.rel <= 1 ? "STOPS RIGHT AWAY" : snd.rel <= 5 ? "SHORT FADE" : "LONG FADE";
+        else
+            now = "TURN KNOBS 1 TO 4";
+        t_small(120, 38, ui.focus >= 0 ? WHAT[ui.focus] : "A SOUND HAS FOUR PARTS", K_INK);
+        t_center(120, 54, now, K_CROCD, 220, 0);
+        c.jaw = env_jaw(t) * 0.9f;
+        croc_mid(144.0f, 0.78f, &c);
+        label_box();
+        px[0] = 26;                          /* the shape of one note: up, down to the hold, along, down */
+        py[0] = 207;
+        px[1] = px[0] + 10 + snd.atk * 4;
+        py[1] = 178;
+        px[2] = px[1] + 10 + snd.dec * 4;
+        py[2] = 207 - (29 * (snd.sus < 1 ? 1 : snd.sus)) / 10;
+        px[3] = px[2] + 38;
+        py[3] = py[2];
+        px[4] = px[3] + 10 + snd.rel * 4;
+        py[4] = 207;
+        m_reset();
+        p_begin();
+        for (i = 0; i < 5; i++)
+            p_add((float)px[i], (float)py[i]);
+        p_fill(K_GLOW2);
+        for (i = 0; i < 4; i++)
+            thick_line(px[i], py[i], px[i + 1], py[i + 1], i == ui.focus ? 5 : 2, i == ui.focus ? K_SUN : K_GLOW);
+        strip(KN, ui.focus);
+        return;
+    }
+    if (ui.page == PG_LFO) {
+        static const char *const KN[4] = {"SPEED", "SIZE", "WHAT", 0};
+        float w = wag_now(t), amp = 3.0f + (float)snd.wag_size * 2.6f, rate = snd.wag ? 1.0f + (float)snd.wag * 0.9f : 0.0f;
+        int32_t i, py = 192;
+        scene(150);
+        t_center(120, 8, snd.wag == 0 ? "TAIL: STILL" : ui.focus == F_K3 ? (snd.wag_to ? "JAW WOBBLE" : "VOICE WOBBLE")
+                             : snd.wag < 5 ? "TAIL WAG" : "WIGGLE WIGGLE", K_INK, 228, 2);
+        c.tail = w * (0.2f + 0.12f * (float)snd.wag_size);
+        c.jaw = snd.wag && snd.wag_to ? 0.35f + 0.3f * w * (0.3f + (float)snd.wag_size / 5.0f) : 0.15f;
+        croc_mid(140.0f, 0.85f, &c);
+        label_box();
+        for (i = 0; i <= 192; i++) {         /* the wag as a line: faster is tighter, bigger is taller */
+            int32_t y = 192 - (snd.wag ? (int32_t)(fm_sinf((float)i / 192.0f * 6.2831853f * (float)snd.wag * 0.75f - t * rate * 2.0f) * amp) : 0);
+            if (i)
+                thick_line(24 + i - 1, py, 24 + i, y, 2, K_GLOW);
+            py = y;
+        }
+        strip(KN, ui.focus);
+        return;
+    }
+    if (ui.page == PG_GLO) {
+        scene(150);
+        t_center(120, 8, "GROWN-UPS", K_INK, 228, 2);
+        c.jaw = 0.1f;
+        croc_mid(140.0f, 0.85f, &c);
+        label_box();
+        t_small(120, 176, "HOLD GLO: NAME THE CROC", K_CREAM);
+        t_small(120, 193, "HOLD HOME: BYE BYE", K_CREAM);
         return;
     }
     scene(150);                              /* a lesson still to come */
@@ -348,8 +624,7 @@ static void draw(void)
 void app_ui_init(void)
 {
     lcd_fill(0, 0, 240, 240, K_SKY);
-    ui.focus = F_NONE;
-    ui.page = PG_HOME;
+    go_page(PG_HOME);
     ui.last_touch = plat_ms();
     set_mode(M_BOOT);
 }
@@ -360,17 +635,19 @@ void app_frame(void)
     input();
     ann_tick(now);
     phones_in = plat_headphones() == 1;      /* the speaker gets no deep bass; headphones do */
-    if (ui.mode == M_BOOT && now - ui.t0 > 2600u)
-        set_mode(M_PLAY);
+    if (ui.mode == M_BOOT && now - ui.t0 > 2600u) {
+        if (set.name[0])
+            set_mode(M_PLAY);
+        else
+            naming_start();                  /* the first power-on: she names the croc */
+    }
     if (ui.mode == M_BYE && now - ui.t0 > 5000u)
         set_mode(M_OFF);
     if (ui.mode == M_PLAY && now - ui.last_touch > 180000u && !voices_sounding())   /* three quiet minutes */
         set_mode(M_BYE);
     if (ui.ov && now >= ui.ov_until)
         ui.ov = OV_NONE;
-    if (dirty_at && now - dirty_at > 3000u && !voices_sounding()) {   /* her sound is kept, a moment after a change */
-        set.magic = SET_MAGIC;
-        set.s = snd;
+    if (dirty_at && now - dirty_at > 3000u && !voices_sounding()) {   /* kept, a moment after a change */
         if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0)
             dirty_at = 0;
         else
@@ -385,22 +662,30 @@ void app_frame(void)
 #ifdef PLAT_HOST
 int app_expect(const char *what, int *got)
 {
+    static const struct {
+        const char *name;
+        int8_t *v;
+    } S[] = {{"teeth", &snd.teeth}, {"rows", &snd.rows}, {"crook", &snd.crook}, {"size", &snd.size},
+             {"jaws", &snd.jaws}, {"atk", &snd.atk}, {"dec", &snd.dec}, {"sus", &snd.sus},
+             {"rel", &snd.rel}, {"wag", &snd.wag}, {"wagsize", &snd.wag_size}, {"wagto", &snd.wag_to}};
+    unsigned i;
+    for (i = 0; i < sizeof S / sizeof S[0]; i++)
+        if (!strcmp(what, S[i].name)) {
+            *got = *S[i].v;
+            return 1;
+        }
     if (!strcmp(what, "mode"))
         *got = ui.mode;
     else if (!strcmp(what, "page"))
         *got = ui.page;
-    else if (!strcmp(what, "teeth"))
-        *got = snd.teeth;
-    else if (!strcmp(what, "rows"))
-        *got = snd.rows;
-    else if (!strcmp(what, "crook"))
-        *got = snd.crook;
-    else if (!strcmp(what, "size"))
-        *got = snd.size;
-    else if (!strcmp(what, "jaws"))
-        *got = snd.jaws;
     else if (!strcmp(what, "voices"))
         *got = voices_sounding();
+    else if (!strcmp(what, "preset"))
+        *got = set.preset;
+    else if (!strcmp(what, "named"))
+        *got = set.name[0] != 0;
+    else if (!strncmp(what, "name", 4) && what[4] >= '0' && what[4] < '0' + NAME_LEN)   /* nameN: letter N's code */
+        *got = set.name[what[4] - '0'];
     else
         return 0;
     return 1;

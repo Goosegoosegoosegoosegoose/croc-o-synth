@@ -325,6 +325,16 @@ static void wave_plot(int kind, int32_t dx, uint16_t col)
         py = y;
     }
 }
+/* a line w pixels thick */
+static void thick_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t w, uint16_t col)
+{
+    int32_t i;
+    for (i = 0; i < w; i++) {
+        cv_line(x0, y0 + i - w / 2, x1, y1 + i - w / 2, col);
+        cv_line(x0 + 1, y0 + i - w / 2, x1 + 1, y1 + i - w / 2, col);
+    }
+}
+
 /* what KNOB 1 to 4 do on this screen, along the bottom; `lit` is the one turned last (-1 none) */
 static void strip(const char *const *names, int lit)
 {
