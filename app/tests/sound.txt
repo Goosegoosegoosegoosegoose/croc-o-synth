@@ -44,18 +44,25 @@ key 14 up
 key 19 up
 wait 400
 wavstop
-# the tail wag on the voice, then on the jaws
+# the tail wag tickling the tail (pitch), the belly (volume), the snoot (filter)
 tap LFO
 turn K1 5
 turn K2 4
-wav wag-voice.wav
+wav wag-tail.wav
 key 7 down
 wait 1200
 key 7 up
 wait 300
 wavstop
 turn K3 1
-wav wag-jaws.wav
+wav wag-belly.wav
+key 7 down
+wait 1200
+key 7 up
+wait 300
+wavstop
+turn K3 1
+wav wag-snoot.wav
 key 7 down
 wait 1200
 key 7 up

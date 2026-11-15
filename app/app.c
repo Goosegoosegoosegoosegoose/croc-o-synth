@@ -2,7 +2,7 @@
  * Copyright 2026 goose */
 /* Croc-O-Synth: a crocodile teaches synth basics, one lesson a button.
  *   HOME       the croc, wearing the sound          EDIT   teeth: shape, rows, crooked
- *   ENV        snap or yawn: open, relax, hold, close      LFO    tail wag: speed, size, what
+ *   ENV        snap or yawn: open, relax, hold, close      LFO    tail wag: speed, size, tickle
  *   PRESETS    five sounds and My Croc              ALGORITHM   the jaws, on every page
  *   OCT- OCT+  big croc, croc, small croc           HOME held: goodbye      GLO held: name the croc
  * Part of the platform's unity build (base/device/unity.c, base/host/plat_host.c), after the platform: gfx.c and
@@ -12,7 +12,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 5"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 6"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -34,14 +34,14 @@ static const sound_t PRESET[NPRESET] = {{0, 1, 2, -1, 9, 0, 4, 7, 2, 0, 2, 0},
                                         {2, 2, 1, 1, 4, 0, 5, 6, 2, 0, 2, 0},
                                         {1, 1, 2, 0, 10, 0, 2, 2, 1, 0, 2, 0},
                                         {0, 3, 2, 0, 5, 8, 5, 8, 8, 2, 1, 0},
-                                        {1, 1, 2, -1, 7, 1, 4, 7, 3, 6, 3, 1}};
+                                        {1, 1, 2, -1, 7, 1, 4, 7, 3, 6, 3, 2}};
 
 static int sound_ok(const sound_t *s)
 {
     return s->teeth >= 0 && s->teeth <= 2 && s->rows >= 1 && s->rows <= 3 && s->crook >= 0 && s->crook <= 4 &&
            s->size >= -1 && s->size <= 1 && s->jaws >= 0 && s->jaws <= 12 && s->atk >= 0 && s->atk <= 10 &&
            s->dec >= 0 && s->dec <= 10 && s->sus >= 0 && s->sus <= 10 && s->rel >= 0 && s->rel <= 10 &&
-           s->wag >= 0 && s->wag <= 8 && s->wag_size >= 0 && s->wag_size <= 4 && s->wag_to >= 0 && s->wag_to <= 1;
+           s->wag >= 0 && s->wag <= 8 && s->wag_size >= 0 && s->wag_size <= 4 && s->wag_to >= 0 && s->wag_to <= 2;
 }
 static int name_ok(const char *n)
 {
@@ -314,7 +314,7 @@ static void input(void)
                 else if (k == 1)
                     step(&snd.wag_size, d, 0, 4);
                 else if (k == 2)
-                    step(&snd.wag_to, d, 0, 1);
+                    step(&snd.wag_to, d, 0, 2);
                 else
                     used = 0;
             } else {
@@ -367,6 +367,8 @@ static void croc_look(croc_t *c)             /* the croc as the sound has it */
     c->sleep = 0;
     c->wave = 0;
     c->wave_ph = 0.0f;
+    c->tail_len = 1.0f;
+    c->puff = 0.0f;
 }
 
 static void picture_name(float t)
@@ -495,10 +497,14 @@ static void picture(float t)
             text_join(buf, "HELLO!", "", "");
         t_center(120, 8, buf, K_INK, 224, 2);
         c.jaw = (0.12f + 0.88f * (float)snd.jaws / 12.0f) * (0.25f + 0.75f * env_jaw(t));
-        if (snd.wag_to)
+        if (snd.wag && snd.wag_to == 2)
             c.jaw = fm_clampf(c.jaw + 0.15f * w * (0.3f + (float)snd.wag_size / 5.0f), 0.0f, 1.0f);
+        if (snd.wag && snd.wag_to == 1)
+            c.puff = w * (0.3f + (float)snd.wag_size * 0.17f);
+        if (snd.wag)
+            c.tail_len = 1.0f + (float)snd.wag_size * 0.1f;
         c.tail = w * 0.5f;
-        croc_draw(120.0f + 19.0f * s, 150.0f - 8.0f * s, s, &c);
+        croc_draw(120.0f + 19.0f * s, 150.0f - 8.0f * s - (snd.wag && snd.wag_to == 0 ? w * (1.0f + (float)snd.wag_size) : 0.0f), s, &c);
         label_box();
         t_center(120, 184, set.preset < NPRESET ? PRESET_NAME[set.preset] : "MY CROC", set.preset < NPRESET ? K_SUN : K_BLUSH,
                  200, 0);
@@ -571,15 +577,43 @@ static void picture(float t)
         return;
     }
     if (ui.page == PG_LFO) {
-        static const char *const KN[4] = {"SPEED", "SIZE", "WHAT", 0};
-        float w = wag_now(t), amp = 3.0f + (float)snd.wag_size * 2.6f, rate = snd.wag ? 1.0f + (float)snd.wag * 0.9f : 0.0f;
+        static const char *const KN[4] = {"SPEED", "SIZE", "TICKLE", 0};
+        static const char *const TICKLE[3] = {"TICKLE THE TAIL", "TICKLE THE BELLY", "TICKLE THE SNOOT"};
+        static const char *const DOES[3] = {"THE NOTE WOBBLES UP AND DOWN", "THE SOUND GOES LOUD AND SOFT", "THE SOUND GOES WAH WAH"};
+        static const char *const BIG[5] = {"TINY", "SMALL", "MEDIUM", "BIG", "HUGE"};
+        /* where the feather's tip touches, on a croc drawn by croc_mid(144, 0.78): the tail, the belly, the snoot */
+        static const float TIPX[3] = {62.0f, 112.0f, 184.0f}, TIPY[3] = {138.0f, 152.0f, 131.0f}, TIPR[3] = {-0.35f, 0.45f, 0.35f};
+        float w = wag_now(t), big = (float)snd.wag_size, amp = 3.0f + big * 2.6f, rate = snd.wag ? 1.0f + (float)snd.wag * 0.9f : 0.0f;
+        const char *what, *now;
         int32_t i, py = 192;
         scene(150);
-        t_center(120, 8, snd.wag == 0 ? "TAIL: STILL" : ui.focus == F_K3 ? (snd.wag_to ? "JAW WOBBLE" : "VOICE WOBBLE")
-                             : snd.wag < 5 ? "TAIL WAG" : "WIGGLE WIGGLE", K_INK, 228, 2);
-        c.tail = w * (0.2f + 0.12f * (float)snd.wag_size);
-        c.jaw = snd.wag && snd.wag_to ? 0.35f + 0.3f * w * (0.3f + (float)snd.wag_size / 5.0f) : 0.15f;
-        croc_mid(140.0f, 0.85f, &c);
+        if (ui.focus == F_K2) {
+            what = "HOW BIG THE WAG IS";
+            now = BIG[snd.wag_size];
+        } else if (ui.focus == F_K3) {
+            what = DOES[snd.wag_to];
+            now = snd.wag ? "HEE HEE HEE!" : "TURN SPEED UP TO TICKLE";
+        } else {
+            what = "HOW FAST THE TAIL WAGS";
+            now = snd.wag == 0 ? "STILL" : snd.wag <= 2 ? "SLOW" : snd.wag <= 5 ? "QUICK" : "SUPER FAST";
+        }
+        t_center(120, 4, ui.focus == F_K3 ? TICKLE[snd.wag_to] : snd.wag == 0 ? "TAIL: STILL" : snd.wag < 6 ? "TAIL WAG" : "WIGGLE WIGGLE",
+                 K_INK, 228, 2);
+        t_small(120, 38, what, K_INK);
+        t_center(120, 54, now, K_CROCD, 220, 0);
+        c.tail = w * (0.2f + 0.12f * big);
+        c.tail_len = 1.0f + big * 0.17f;     /* a bigger wag, a longer tail */
+        c.jaw = 0.15f;
+        if (snd.wag) {
+            c.sleep = 2;                     /* it tickles: laughing eyes */
+            if (snd.wag_to == 1)
+                c.puff = w * (0.35f + big * 0.16f);
+            if (snd.wag_to == 2)
+                c.jaw = 0.4f + 0.35f * w * (0.4f + big / 6.0f);
+        }
+        croc_mid(144.0f - (snd.wag && snd.wag_to == 0 ? w * (1.5f + big) : 0.0f), 0.78f, &c);
+        m_reset();
+        feather(TIPX[snd.wag_to] + w * (3.0f + big * 1.5f), TIPY[snd.wag_to], TIPR[snd.wag_to] + w * 0.25f);
         label_box();
         for (i = 0; i <= 192; i++) {         /* the wag as a line: faster is tighter, bigger is taller */
             int32_t y = 192 - (snd.wag ? (int32_t)(fm_sinf((float)i / 192.0f * 6.2831853f * (float)snd.wag * 0.75f - t * rate * 2.0f) * amp) : 0);

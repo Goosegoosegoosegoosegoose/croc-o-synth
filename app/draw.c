@@ -182,6 +182,8 @@ typedef struct {
     int sleep;
     int wave;                            /* an arm waves */
     float wave_ph;
+    float tail_len;                      /* 1 the usual tail; longer for a bigger wag */
+    float puff;                          /* the belly swells: -1..1 */
 } croc_t;
 
 static void tooth(float x, int style, uint16_t col)   /* hangs from y = 1 */
@@ -216,6 +218,7 @@ static void croc_draw(float cx, float cy, float s, const croc_t *o)
     m_push();
     m_translate(-62.0f, 2.0f);
     m_rotate(o->tail);
+    m_scale(o->tail_len, 1.0f);
     p_begin();
     for (i = 0; i <= 4; i++) {           /* the upper edge out to the tip, then the lower edge back */
         float t = (float)i / 4.0f, u = 1.0f - t;
@@ -236,7 +239,7 @@ static void croc_draw(float cx, float cy, float s, const croc_t *o)
         s_tri(x, yt + 4.0f, x + 6.0f, yt - 8.0f, x + 12.0f, yt + 4.0f, K_CROCD);
     }
     s_ellipse(-30.0f, 0.0f, 40.0f, 22.0f, K_CROC);
-    s_ellipse(-30.0f, 11.0f, 29.0f, 8.0f, K_BELLY);
+    s_ellipse(-30.0f, 11.0f + o->puff * 2.5f, 29.0f * (1.0f + o->puff * 0.12f), 8.0f * (1.0f + o->puff * 0.55f), K_BELLY);
     if (o->wave) {
         m_push();
         m_translate(-6.0f, -6.0f);
@@ -283,7 +286,10 @@ static void croc_draw(float cx, float cy, float s, const croc_t *o)
     m_pop();
     /* eye, cheek */
     s_ellipse(14.0f, -24.0f, 11.0f, 11.0f, K_CROC);
-    if (o->sleep) {
+    if (o->sleep == 2) {                 /* laughing: the eye squeezed into a little arch */
+        s_ellipse(15.0f, -24.0f, 6.5f, 5.0f, K_INK);
+        s_ellipse(15.0f, -21.8f, 6.5f, 4.6f, K_CROC);
+    } else if (o->sleep) {
         s_rrect(9.0f, -24.0f, 12.0f, 2.4f, 1.2f, K_INK);
     } else {
         s_ellipse(15.0f, -25.0f, 7.5f, 7.5f, K_TOOTH);
@@ -294,6 +300,18 @@ static void croc_draw(float cx, float cy, float s, const croc_t *o)
     m_pop();
 }
 static void croc_mid(float y, float s, const croc_t *o) { croc_draw(120.0f + 19.0f * s, y, s, o); }
+
+/* a feather with its tip at (x, y), the rest of it off at angle r (0: straight up from the tip) */
+static void feather(float x, float y, float r)
+{
+    m_push();
+    m_translate(x, y);
+    m_rotate(r);
+    s_ellipse(0.0f, -13.0f, 5.0f, 12.0f, K_MOUTH);
+    s_ellipse(1.5f, -13.0f, 2.2f, 9.0f, K_BLUSH);
+    s_rrect(-0.9f, -30.0f, 1.8f, 28.0f, 0.9f, K_TOOTH);
+    m_pop();
+}
 
 /* ------------------------------------------------------- screen pieces --- */
 static void scene(int32_t water_y)

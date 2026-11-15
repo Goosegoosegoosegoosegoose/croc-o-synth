@@ -70,7 +70,8 @@ These are standard synthesizer concepts, not anything taken from a particular fi
 | Decay | Relax |
 | Sustain | Hold |
 | Release | Close |
-| LFO rate / depth / destination | Tail wag: speed / size / what |
+| LFO rate / depth / destination | Tail wag: speed / size / tickle |
+| LFO to pitch (vibrato) / to volume (tremolo) / to filter cutoff | Tickle the tail / the belly / the snoot |
 | Delay amount / delay time | Swamp echo / far |
 | Reverb | Cave |
 | Tempo | Hop speed |

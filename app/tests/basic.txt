@@ -83,10 +83,21 @@ turn K1 4
 expect wag 4
 turn K2 1
 expect wagsize 3
+wait 100
+shot lfo-size.png
 turn K3 1
 expect wagto 1
 wait 100
-shot lfo.png
+shot lfo-belly.png
+turn K3 5
+expect wagto 2
+wait 100
+shot lfo-snoot.png
+turn K3 -9
+expect wagto 0
+wait 100
+shot lfo-tail.png
+turn K3 2
 # the ready-made sounds, and My Croc comes back
 turn PRESET -9
 expect preset 0
@@ -128,7 +139,7 @@ expect size 1
 expect jaws 3
 expect atk 6
 expect wag 4
-expect wagto 1
+expect wagto 2
 shot home-after.png
 # GLO held: rename; HOME finishes
 press GLO

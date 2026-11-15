@@ -6,6 +6,19 @@ All of these are development builds, so the FM-1 reports the same identity for e
 
 All dates are 2026-11-15.
 
+## Build 6: tickle
+
+- Commit: the one that adds this entry. Download: the matching **Build firmware** run on the Actions tab.
+- **Changed, on the tail wag lesson (LFO):**
+  - knob 3 is now **TICKLE**: tickle the **tail** (the note wobbles up and down: pitch), the **belly** (the sound goes loud and soft: volume, new), or the **snoot** (the sound goes wah wah: the filter). A feather moves along the croc from back to front as the knob turns
+  - each knob has a line saying what it does and where it is set, as on the envelope lesson
+  - **size** makes the tail grow
+  - the croc reacts: it bobs for the tail, its belly swells for the belly, its jaw flaps for the snoot, and its eyes squeeze shut laughing whenever the wag is on
+  - the home croc shows the same things
+- **Note:** a My Croc sound saved in build 5 with the jaw wobble now tickles the belly; turn TICKLE one more step to get the snoot back.
+- **Checked:** simulator checks pass. Measured: tickling the belly swings the loudness about 8 times at a big wag and leaves pitch and brightness alone; the tail moves the pitch; the snoot sweeps the brightness.
+- **On the FM-1:** not reported yet.
+
 ## Build 5: envelope, tail wag, presets, the croc's name
 
 - Commit: the one that adds this entry. Download: the matching **Build firmware** run on the Actions tab.
@@ -19,7 +32,7 @@ All dates are 2026-11-15.
   - "BUILD 5" in the corner of the greeting, so the build in an FM-1 can be read off its screen
 - **Checked:** the simulator checks pass, now 60 of them, including naming, presets, and everything kept across a power cycle. Measured in the simulator: the wag moves the pitch by about a semitone each way at its largest, and on the jaws it sweeps the brightness without moving the pitch.
 - **Note:** the saved record changed, so the first start after installing asks for the croc's name and begins from Baby Croc.
-- **On the FM-1:** not reported yet.
+- **On the FM-1:** installed; the copy on the tail wag lesson needed work ("What" explained nothing), which led to build 6.
 
 ## Build 4: three croc sizes
 

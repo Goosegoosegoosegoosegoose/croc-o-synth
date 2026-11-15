@@ -23,7 +23,7 @@ Open `prototype/index.html` in a browser. Tap the screen to wake the croc.
 | --- | --- | --- |
 | EDIT | Teeth | Wave shape; rows of teeth are unison voices (x1 to x3); crooked is detune |
 | ENV | Snap or yawn | Open, Relax, Hold, Close: attack, decay, sustain, release |
-| LFO | Tail wag | LFO speed, depth, target (pitch or filter) |
+| LFO | Tail wag: speed, size, tickle | LFO rate, depth, destination. Tickle the tail is pitch, the belly is volume, the snoot is the filter |
 | FX | Swamp echo and cave | Delay amount and time, reverb |
 | SEQ + PLAY | Lily pad steps | Eight-step sequencer |
 | OCT- / OCT+ | Small croc, croc, big croc | Octave: three of them, all inside the speaker's range |

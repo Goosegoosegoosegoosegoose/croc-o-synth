@@ -93,7 +93,7 @@ canvas{display:block;width:100%;aspect-ratio:1;border-radius:9px}
     <dl>
       <dt>EDIT</dt><dd>Teeth: wave shape (sine, saw, square). Rows of teeth are unison voices, x1 to x3 (top, bottom, back row). Crooked is the detune between them</dd>
       <dt>ENV</dt><dd>Snap or yawn: attack, decay, sustain, release on knobs 1 to 4</dd>
-      <dt>LFO</dt><dd>Tail wag: speed, depth, and target (pitch or filter)</dd>
+      <dt>LFO</dt><dd>Tail wag: speed, depth, and what it tickles. Tail is pitch (vibrato), belly is volume (tremolo), snoot is the filter (wah)</dd>
       <dt>FX</dt><dd>Swamp echo and cave: delay amount and time, reverb</dd>
       <dt>SEQ, PLAY</dt><dd>Lily pad steps: an eight-step sequencer</dd>
       <dt>OCT</dt><dd>Small croc, croc, big croc: three octaves, all inside the FM-1 speaker's range</dd>
@@ -118,13 +118,13 @@ function now(){return performance.now()/1000;}
 
 /* ---------- settings ---------- */
 var SOUND=['teeth','uni','twin','size','jaws','atk','dec','sus','rel','wag','wagSize','wagTo','echo','echoTime','cave'];
-var RANGE={teeth:[0,2],uni:[1,3],twin:[0,4],size:[-1,1],jaws:[0,12],atk:[0,10],dec:[0,10],sus:[0,10],rel:[0,10],wag:[0,8],wagSize:[0,4],wagTo:[0,1],echo:[0,6],echoTime:[0,4],cave:[0,6]};
+var RANGE={teeth:[0,2],uni:[1,3],twin:[0,4],size:[-1,1],jaws:[0,12],atk:[0,10],dec:[0,10],sus:[0,10],rel:[0,10],wag:[0,8],wagSize:[0,4],wagTo:[0,2],echo:[0,6],echoTime:[0,4],cave:[0,6]};
 var PRESETS=[
   ['BABY CROC',   [0,1,2,-1,9, 0,4,7,2, 0,2,0, 1,2,1]],
   ['SWAMP BASS',  [2,2,1,1,4,  0,5,6,2, 0,2,0, 0,2,0]],
   ['CHOMPER',     [1,1,2,0,10, 0,2,2,1, 0,2,0, 2,1,0]],
   ['SLEEPY YAWN', [0,3,2,0,5,  8,5,8,8, 2,1,0, 3,3,4]],
-  ['WIGGLE TAIL', [1,1,2,-1,7, 1,4,7,3, 6,3,1, 2,2,1]]
+  ['WIGGLE TAIL', [1,1,2,-1,7, 1,4,7,3, 6,3,2, 2,2,1]]
 ];
 var MINE=null, P={}, preset=0, G={vol:7,tempo:3,gate:2};
 try{ var st=JSON.parse(localStorage.getItem('croc-mine3')||'null'); if(st&&SOUND.every(function(k){return typeof st[k]==='number'&&st[k]>=RANGE[k][0]&&st[k]<=RANGE[k][1];})){ MINE=st; preset=5; } }catch(e){}
@@ -145,7 +145,7 @@ var PAGES={
   home:{k:[['teeth','TEETH'],['snap','SNAP'],['wag','WAG'],['echo','ECHO']]},
   edit:{k:[['teeth','TEETH'],['uni','ROWS'],['twin','CROOKED'],null]},
   env:{k:[['atk','OPEN'],['dec','RELAX'],['sus','HOLD'],['rel','CLOSE']]},
-  lfo:{k:[['wag','SPEED'],['wagSize','SIZE'],['wagTo','WHAT'],null]},
+  lfo:{k:[['wag','SPEED'],['wagSize','SIZE'],['wagTo','TICKLE'],null]},
   fx:{k:[['echo','ECHO'],['echoTime','FAR'],['cave','CAVE'],null]},
   seq:{k:[['cursor','PAD'],['pads','HOW MANY'],['gate','HOP'],['clear','EMPTY']]},
   scl:{soon:'SAFE SWAMP'}, arp:{soon:'CROC HOPS'}, rec:{soon:'CROC REMEMBERS'}, save:{soon:'SAVE'}, glo:{}
@@ -153,7 +153,7 @@ var PAGES={
 var mode='boot', awake=false, bootEnd=0, byeAt=0, page='home', focus=null, ov=null, lastTouch=0;
 
 /* ---------- sound ---------- */
-var ac=null,filt,dly,fb,wet,conv,caveG,comp,master,lfo,lfoPitch,lfoFilt,voices={},vorder=[];
+var ac=null,filt,trem,dly,fb,wet,conv,caveG,comp,master,lfo,lfoPitch,lfoFilt,lfoTrem,voices={},vorder=[];
 var WAVES=['sine','sawtooth','square'], LEVEL=[0.5,0.26,0.2], TWIN=[0,6,12,20,30], ETIME=[0.18,0.26,0.34,0.45,0.6];
 function initAudio(){
   if(ac) return;
@@ -166,11 +166,12 @@ function initAudio(){
     for(ch=0;ch<2;ch++){ d=ir.getChannelData(ch); for(i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.5); }
     conv.buffer=ir;
     comp=ac.createDynamicsCompressor(); master=ac.createGain();
-    filt.connect(comp); filt.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(comp);
-    filt.connect(conv); conv.connect(caveG); caveG.connect(comp);
+    trem=ac.createGain(); filt.connect(trem);
+    trem.connect(comp); trem.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(comp);
+    trem.connect(conv); conv.connect(caveG); caveG.connect(comp);
     comp.connect(master); master.connect(ac.destination);
-    lfo=ac.createOscillator(); lfoPitch=ac.createGain(); lfoFilt=ac.createGain();
-    lfo.connect(lfoPitch); lfo.connect(lfoFilt); lfoFilt.connect(filt.detune); lfo.start();
+    lfo=ac.createOscillator(); lfoPitch=ac.createGain(); lfoFilt=ac.createGain(); lfoTrem=ac.createGain();
+    lfo.connect(lfoPitch); lfo.connect(lfoFilt); lfoFilt.connect(filt.detune); lfo.connect(lfoTrem); lfoTrem.connect(trem.gain); lfo.start();
     applyParams();
   }catch(e){ac=null;}
 }
@@ -188,7 +189,9 @@ function applyParams(){
   caveG.gain.setTargetAtTime(P.cave/6*0.7,t,0.03);
   lfo.frequency.setTargetAtTime(P.wag?1+P.wag*0.9:0.01,t,0.03);
   lfoPitch.gain.setTargetAtTime(P.wag&&P.wagTo===0?[8,18,35,60,100][P.wagSize]:0,t,0.03);
-  lfoFilt.gain.setTargetAtTime(P.wag&&P.wagTo===1?[200,500,900,1500,2400][P.wagSize]:0,t,0.03);
+  lfoFilt.gain.setTargetAtTime(P.wag&&P.wagTo===2?[200,500,900,1500,2400][P.wagSize]:0,t,0.03);
+  var dip=P.wag&&P.wagTo===1?[0.2,0.35,0.5,0.7,0.9][P.wagSize]:0;   /* the belly: the volume dips this far */
+  trem.gain.setTargetAtTime(1-dip/2,t,0.03); lfoTrem.gain.setTargetAtTime(dip/2,t,0.03);
   master.gain.setTargetAtTime(G.vol/10*0.5,t,0.03);
   for(m in voices) voices[m].os.forEach(function(o,j,a){ o.type=WAVES[P.teeth]; o.frequency.setTargetAtTime(freq(+m),t,0.02); o.detune.setTargetAtTime(spread(j,a.length),t,0.02); });
 }
@@ -414,12 +417,12 @@ function tooth(x,style,col){
 function croc(cx,cy,s,o){
   o=o||{}; var jaw=o.jaw||0, i;
   g.save(); g.translate(cx,cy); g.scale(s,s);
-  g.save(); g.translate(-62,2); g.rotate(o.tail||0); g.fillStyle=C.croc;
+  g.save(); g.translate(-62,2); g.rotate(o.tail||0); g.scale(o.tailLen||1,1); g.fillStyle=C.croc;
   g.beginPath(); g.moveTo(8,-16); g.quadraticCurveTo(-30,-14,-58,-4); g.quadraticCurveTo(-30,10,8,16); g.closePath(); g.fill(); g.restore();
   g.fillStyle=C.crocD; rr(-58,12,15,16,6); rr(-16,12,15,16,6);
   for(i=0;i<5;i++){ var x=-60+i*13, yt=-22*Math.sqrt(Math.max(0,1-Math.pow((x+6+30)/40,2))); g.beginPath(); g.moveTo(x,yt+4); g.lineTo(x+6,yt-8); g.lineTo(x+12,yt+4); g.closePath(); g.fill(); }
   g.fillStyle=C.croc; el(-30,0,40,22);
-  g.fillStyle=C.belly; el(-30,11,29,8);
+  var pf=o.puff||0; g.fillStyle=C.belly; el(-30,11+pf*2.5,29*(1+pf*0.12),8*(1+pf*0.55));
   if(o.wave!=null){ g.save(); g.translate(-6,-6); g.rotate(-0.5+Math.sin(o.wave)*0.45); g.fillStyle=C.crocD; rr(-5,-40,10,42,5); g.fillStyle=C.croc; el(0,-40,7,7); g.restore(); }
   g.fillStyle=C.croc; el(18,-6,22,20);
   if(jaw>0.02){ var a1=jaw*0.5, a2=jaw*0.25; g.fillStyle=C.mouth; g.beginPath(); g.moveTo(22,-2); g.lineTo(26+54*Math.cos(a1),-2-54*Math.sin(a1)); g.lineTo(26+52*Math.cos(a2),-2+52*Math.sin(a2)+6); g.closePath(); g.fill(); }
@@ -433,12 +436,15 @@ function croc(cx,cy,s,o){
   for(i=0;i<5;i++) tooth(10+i*9,o.teeth==null?1:o.teeth);
   g.restore();
   g.fillStyle=C.croc; el(14,-24,11,11);
-  if(o.sleep){ g.strokeStyle=C.ink; g.lineWidth=2; g.beginPath(); g.arc(15,-25,5,0.15*Math.PI,0.85*Math.PI); g.stroke(); }
+  if(o.sleep===2){ g.strokeStyle=C.ink; g.lineWidth=2.4; g.beginPath(); g.arc(15,-22,6,1.15*Math.PI,1.85*Math.PI); g.stroke(); }
+  else if(o.sleep){ g.strokeStyle=C.ink; g.lineWidth=2; g.beginPath(); g.arc(15,-25,5,0.15*Math.PI,0.85*Math.PI); g.stroke(); }
   else { g.fillStyle='#fff'; el(15,-25,7.5,7.5); g.fillStyle=C.ink; el(17,-25,3.7,3.7); g.fillStyle='#fff'; el(18.4,-26.6,1.3,1.3); }
   g.globalAlpha=0.65*g.globalAlpha; g.fillStyle=C.blush; el(25,-9,5,3);
   g.restore();
 }
 function crocMid(y,s,o){ croc(120+19*s,y,s,o); }
+/* a feather with its tip at (x, y), the rest of it off at angle r (0: straight up from the tip) */
+function feather(x,y,r){ g.save(); g.translate(x,y); g.rotate(r); g.fillStyle=C.mouth; el(0,-13,5,12); g.fillStyle=C.blush; el(1.5,-13,2.2,9); g.fillStyle='#fff'; g.fillRect(-0.9,-30,1.8,28); g.restore(); }
 function wavePlot(kind,dx,alpha){
   g.globalAlpha=alpha; g.strokeStyle=C.glow; g.lineWidth=3; g.lineJoin='round'; g.beginPath();
   var x, n=192;
@@ -462,7 +468,8 @@ function drawPage(pg,ta){
     g.strokeStyle='rgba(255,255,255,.7)'; g.lineWidth=2;
     for(i=0;i<P.echo;i++){ var q2=((ta*0.35)+i/Math.max(1,P.echo))%1; g.globalAlpha=1-q2; g.beginPath(); g.ellipse(sx-20*sS,160,20+q2*90,3+q2*9,0,0,Math.PI*2); g.stroke(); }
     g.globalAlpha=1;
-    croc(sx,sy,sS,{jaw:jawS,teeth:P.teeth,rows:P.uni,crook:P.twin,tail:wagAngle(ta,0.5)});
+    var hw=wagAngle(ta,1);
+    croc(sx,sy-(P.wag&&P.wagTo===0?hw*(1+P.wagSize):0),sS,{jaw:P.wag&&P.wagTo===2?Math.max(0,Math.min(1,jawS+0.15*hw*(0.3+P.wagSize/5))):jawS,teeth:P.teeth,rows:P.uni,crook:P.twin,tail:hw*0.5,tailLen:P.wag?1+P.wagSize*0.1:1,puff:P.wag&&P.wagTo===1?hw*(0.3+P.wagSize*0.17):0});
     panel(); label(preset===5?'MY CROC':PRESETS[preset][0],preset===5?C.blush:C.sun);
   }
   else if(pg==='edit'){
@@ -492,12 +499,20 @@ function drawPage(pg,ta){
   }
   else if(pg==='lfo'){
     scene(150);
-    text(P.wag===0?'TAIL: STILL':focus==='wagTo'||P.wagTo===1&&focus!=='wag'&&focus!=='wagSize'?(P.wagTo?'JAW WOBBLE':'VOICE WOBBLE'):(P.wag<5?'TAIL WAG':'WIGGLE WIGGLE'),120,24,27,C.ink,216);
-    var amp=0.2+0.12*P.wagSize, w=wagAngle(ta,1);
-    crocMid(140,0.85,{jaw:P.wagTo&&P.wag?0.35+0.3*w*(0.3+P.wagSize/5):0.15,tail:w*amp,teeth:P.teeth,rows:P.uni,crook:P.twin});
+    var w=wagAngle(ta,1), big=P.wagSize, to=P.wagTo;
+    var TICK=['TICKLE THE TAIL','TICKLE THE BELLY','TICKLE THE SNOOT'], DOES=['THE NOTE WOBBLES UP AND DOWN','THE SOUND GOES LOUD AND SOFT','THE SOUND GOES WAH WAH'];
+    var ld=focus==='wagSize'?['HOW BIG THE WAG IS',['TINY','SMALL','MEDIUM','BIG','HUGE'][big]]
+      :focus==='wagTo'?[DOES[to],P.wag?'HEE HEE HEE!':'TURN SPEED UP TO TICKLE']
+      :['HOW FAST THE TAIL WAGS',P.wag===0?'STILL':P.wag<=2?'SLOW':P.wag<=5?'QUICK':'SUPER FAST'];
+    text(focus==='wagTo'?TICK[to]:P.wag===0?'TAIL: STILL':P.wag<6?'TAIL WAG':'WIGGLE WIGGLE',120,22,27,C.ink,216);
+    text(ld[0],120,50,12.5,C.ink,220); text(ld[1],120,68,15,C.crocD,220);
+    /* a bigger wag, a longer tail; the tickled part moves; laughing eyes */
+    crocMid(144-(P.wag&&to===0?w*(1.5+big):0),0.78,{jaw:P.wag&&to===2?0.4+0.35*w*(0.4+big/6):0.15,tail:w*(0.2+0.12*big),tailLen:1+big*0.17,
+      puff:P.wag&&to===1?w*(0.35+big*0.16):0,sleep:P.wag?2:0,teeth:P.teeth,rows:P.uni,crook:P.twin});
+    feather([62,112,184][to]+w*(3+big*1.5),[138,152,131][to],[-0.35,0.45,0.35][to]+w*0.25);
     panel(); g.strokeStyle=C.glow; g.lineWidth=3; g.beginPath();
     var rate=P.wag?1+P.wag*0.9:0;
-    for(i=0;i<=192;i++){ var y=192-(P.wag?Math.sin(i/192*Math.PI*2*P.wag*0.75-ta*rate*2)*(3+P.wagSize*2.6):0); if(i===0) g.moveTo(24,y); else g.lineTo(24+i,y); }
+    for(i=0;i<=192;i++){ var y=192-(P.wag?Math.sin(i/192*Math.PI*2*P.wag*0.75-ta*rate*2)*(3+big*2.6):0); if(i===0) g.moveTo(24,y); else g.lineTo(24+i,y); }
     g.stroke();
   }
   else if(pg==='fx'){
