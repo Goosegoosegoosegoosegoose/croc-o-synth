@@ -32,7 +32,7 @@ static float flt_ic1, flt_ic2, gain_now;
 static float mixbuf[APP_BLOCK];
 
 static const float CROOK_CENTS[5] = {0.0f, 6.0f, 12.0f, 20.0f, 30.0f};
-static const float WAVE_LEVEL[3] = {0.75f, 0.48f, 0.4f};
+static const float WAVE_LEVEL[3] = {0.62f, 0.42f, 0.35f};
 static const float ROW_LEVEL[3] = {1.0f, 0.72f, 0.58f};
 
 static void note_on(int32_t note)
@@ -96,9 +96,12 @@ static inline float polyblep(float t, float dt)
 
 static inline float row_cents(int j, int n, float d) { return n == 1 ? 0.0f : n == 2 ? (j ? d * 0.5f : -d * 0.5f) : (float)(j - 1) * d; }
 
-/* The round tooth: a sine bent by itself, so it has a second and third harmonic. A pure sine's low notes are below
- * what the FM-1's small speaker can play, and were nearly silent on it. */
-static inline float wave_round(float ph) { return fm_sin_turns(ph + 0.14f * fm_sin_turns(ph)); }
+/* The round tooth: a sine bent by itself (by `bend` turns), so it has harmonics. A pure sine's low notes are below
+ * what the FM-1's small speaker can play; the lower the note, the more it is bent, so its harmonics carry it. */
+static inline float wave_round(float ph, float bend) { return fm_sin_turns(ph + bend * fm_sin_turns(ph)); }
+
+static volatile uint8_t phones_in;       /* headphones plugged in (the main loop reads the jack) */
+static float hp_ic1, hp_ic2;
 
 /* what the mix is made of, kept from block to block: a change of rows or teeth fades over one block (5.8 ms)
  * instead of jumping, which crackled on the FM-1 */
@@ -111,7 +114,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     sound_t s = snd;
     uint32_t i;
     int v, j, kk;
-    float gain = (float)master_q12 / 4096.0f * 8300000.0f * 0.85f;     /* MASTER, with a little kept back */
+    float gain = (float)master_q12 / 4096.0f * 8300000.0f * 0.6f;      /* MASTER, with room kept for the small speaker */
     float a = (float)s.atk / 10.0f;
     float a_inc = 1.0f / ((0.005f + a * a * 0.8f) * SRATE);
     float kd = 3.0f / ((0.05f + (float)s.dec / 10.0f * 0.8f) * SRATE);
@@ -119,6 +122,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float sus = (float)s.sus / 10.0f;
     float fc = 200.0f * fm_powf(40.0f, (float)s.jaws / 12.0f);        /* 200 Hz closed .. 8 kHz wide open */
     float g, k = 0.5f, a1, a2, a3, inv_n, norm0, norm1;
+    float hg = fm_tanf(3.14159265f * (phones_in ? 30.0f : 170.0f) / SRATE), hk = 1.414f;   /* below this the speaker only rattles */
+    float h1 = 1.0f / (1.0f + hg * (hg + hk)), h2 = hg * h1, h3 = hg * h2;
     float rg0[NROW], rg1[NROW], ww0[3], ww1[3];
     int act[NROW], wact[3];
     midi_in();
@@ -158,7 +163,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         mixbuf[i] = 0.0f;
     for (v = 0; v < NV; v++) {
         voice_t *vc = &vv[v];
-        float inc[NROW], base, kt, env = vc->env;
+        float inc[NROW], base, bend, env = vc->env;
         uint32_t trig = vc->trig;
         uint8_t stage = vc->stage, gate = vc->gate;
         if (trig != vc->seen) {
@@ -173,7 +178,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         if (!stage)
             continue;
         base = 440.0f * fm_exp2f((float)(vc->note - 69) / 12.0f - (float)s.size) / SRATE;
-        kt = fm_clampf(fm_sqrtf(400.0f / (base * SRATE)), 0.8f, 1.8f);     /* low notes a little louder */
+        bend = fm_clampf(0.14f * fm_powf(350.0f / (base * SRATE), 0.75f), 0.14f, 0.6f);   /* lower notes, more harmonics */
         for (j = 0; j < NROW; j++) {
             float cents;
             if (!act[j])
@@ -206,7 +211,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
                     ph -= 1.0f;
                 vc->ph[j] = ph;
                 if (wact[0])
-                    w += w0 * WAVE_LEVEL[0] * wave_round(ph);
+                    w += w0 * WAVE_LEVEL[0] * wave_round(ph, bend);
                 if (wact[1])
                     w += w1 * WAVE_LEVEL[1] * (2.0f * ph - 1.0f - polyblep(ph, inc[j]));
                 if (wact[2]) {
@@ -217,7 +222,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
                 }
                 x += w * (rg0[j] + (rg1[j] - rg0[j]) * f);
             }
-            mixbuf[i] += x * env * kt * (norm0 + (norm1 - norm0) * f);
+            mixbuf[i] += x * env * (norm0 + (norm1 - norm0) * f);
         }
         if (stage == 3 && env < 0.0005f) {
             env = 0.0f;
@@ -237,8 +242,14 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         float v1 = a1 * flt_ic1 + a2 * v3, v2 = flt_ic2 + a2 * flt_ic1 + a3 * v3, out, av;
         flt_ic1 = 2.0f * v1 - flt_ic1;
         flt_ic2 = 2.0f * v2 - flt_ic2;
+        {                                    /* a high-pass under the speaker's range (lower with headphones) */
+            float u3 = v2 - hp_ic2, u1 = h1 * hp_ic1 + h2 * u3, u2 = hp_ic2 + h2 * hp_ic1 + h3 * u3;
+            hp_ic1 = 2.0f * u1 - hp_ic1;
+            hp_ic2 = 2.0f * u2 - hp_ic2;
+            v2 = v2 - hk * u1 - u2;
+        }
         av = fm_fabsf(v2);
-        lim_pk = av > lim_pk ? av : lim_pk * 0.9995f;
+        lim_pk = av > lim_pk ? av : lim_pk * 0.99993f;   /* lets go over a third of a second: steady through a low note */
         gain_now += (gain - gain_now) * 0.004f;
         out = v2 * (lim_pk > 1.0f ? 1.0f / lim_pk : 1.0f) * gain_now;
         lr[2 * i] = (int32_t)out;
@@ -247,6 +258,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     flt_ic1 = fm_flush(flt_ic1);
     flt_ic2 = fm_flush(flt_ic2);
     lim_pk = fm_flush(lim_pk);
+    hp_ic1 = fm_flush(hp_ic1);
+    hp_ic2 = fm_flush(hp_ic2);
 }
 
 void app_panic(void)

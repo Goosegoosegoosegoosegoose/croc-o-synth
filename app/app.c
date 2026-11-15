@@ -359,6 +359,7 @@ void app_frame(void)
     uint32_t now = plat_ms();
     input();
     ann_tick(now);
+    phones_in = plat_headphones() == 1;      /* the speaker gets no deep bass; headphones do */
     if (ui.mode == M_BOOT && now - ui.t0 > 2600u)
         set_mode(M_PLAY);
     if (ui.mode == M_BYE && now - ui.t0 > 5000u)

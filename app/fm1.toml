@@ -7,6 +7,7 @@ o2 = []                        # separate units compiled at -O2
 words = "words.tsv"
 ble = false                    # no Bluetooth
 ble_central = false
+headphones = true              # the jack's switch is read: the speaker and headphones get different bass
 # the site (base/tools/make_site.py)
 tagline = "a crocodile teaches synth basics"
 repo = "https://github.com/Goosegoosegoosegoosegoose/croc-o-synth"
