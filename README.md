@@ -5,7 +5,7 @@ A kid-friendly firmware idea for the M-VAVE FM-1 pocket synth: a crocodile teach
 This repository holds two things:
 
 - **`prototype/index.html`**: a click-through mock of the FM-1 panel in a browser, with a stand-in sound engine. This is where the lessons are designed.
-- **`app/`**: the real firmware, in C, built on [fm1-base](https://github.com/charlesvestal/fm1-base). It is early: the start-up greeting, the home croc, the Teeth lesson, the jaws, big and baby croc, and the goodbye. It runs in fm1-base's simulator. **It has not been built for or run on a real FM-1 yet.**
+- **`app/`**: the real firmware, in C, built on [fm1-base](https://github.com/charlesvestal/fm1-base). It is early: the start-up greeting, the home croc, the Teeth lesson, the jaws, big and baby croc, and the goodbye. It runs in fm1-base's simulator and builds for the FM-1. **It has not been run on a real FM-1 yet.**
 
 ![The first firmware screens, from the simulator](docs/img/firmware-first-screens.png)
 
@@ -41,6 +41,8 @@ Screens: "Been awhile, croco-dial!" on start-up, "See you later, oscillator!" on
     tests/run_tests.sh         # builds the simulator and runs the checks: screens, saved settings, sound
     ./build.sh                 # the package for a real FM-1 (needs the JieLi toolchain and SDK; see base/README.md)
 
+The package is also built on GitHub: the **Build firmware** workflow (Actions tab) runs the tests, builds for the FM-1 and keeps `crocosynth.fwsc` as a download. To put it on an FM-1, see [docs/FLASHING.md](docs/FLASHING.md).
+
 The simulator runs a script of presses and turns and writes screenshots and audio: see `app/tests/`.
 
 | File | What |
@@ -57,7 +59,7 @@ The simulator runs a script of presses and turns and writes screenshots and audi
 - Challenges and stars for each lesson
 - Final croc and background art (the current drawing is a placeholder)
 - In the firmware: every lesson except Teeth, the presets, the name screen, the sequencer
-- A build for the device, and a first run on a real FM-1
+- A first run on a real FM-1
 
 ## What the firmware is built on
 
