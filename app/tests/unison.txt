@@ -1,0 +1,51 @@
+# Two things heard on a real FM-1: the same key at different loudness with more than one row of teeth, and a crackle
+# when the rows change under a held note. Records both for measuring.
+#   app/build/host/crocosynth_host app/tests/unison.txt app/build/host
+wait 3000
+tap EDIT
+turn K2 1
+wav taps.wav
+key 7 down
+wait 150
+key 7 up
+wait 437
+key 7 down
+wait 150
+key 7 up
+wait 511
+key 7 down
+wait 150
+key 7 up
+wait 389
+key 7 down
+wait 150
+key 7 up
+wait 463
+key 7 down
+wait 150
+key 7 up
+wait 577
+key 7 down
+wait 150
+key 7 up
+wait 400
+wavstop
+turn K2 -1
+wav switch.wav
+key 7 down
+wait 400
+turn K2 1
+wait 400
+turn K2 1
+wait 400
+turn K2 -1
+wait 400
+turn K1 1
+wait 400
+turn K1 1
+wait 400
+turn K1 -2
+wait 400
+key 7 up
+wait 300
+wavstop

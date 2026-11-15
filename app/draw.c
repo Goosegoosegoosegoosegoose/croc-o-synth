@@ -315,7 +315,7 @@ static void wave_plot(int kind, int32_t dx, uint16_t col)
         float p = (float)(x + dx) / 64.0f, v;
         int32_t y;
         p -= fm_floorf(p);
-        v = kind == 0 ? fm_sin_turns(p) : kind == 1 ? 1.0f - 2.0f * p : p < 0.5f ? 1.0f : -1.0f;
+        v = kind == 0 ? fm_sin_turns(p + 0.14f * fm_sin_turns(p)) : kind == 1 ? 1.0f - 2.0f * p : p < 0.5f ? 1.0f : -1.0f;
         y = 192 - (int32_t)(v * 12.0f);
         if (x) {
             cv_line(24 + x - 1, py, 24 + x, y, col);
