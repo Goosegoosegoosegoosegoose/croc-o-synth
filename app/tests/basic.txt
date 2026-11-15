@@ -38,7 +38,7 @@ wait 2000
 # big croc
 tap OCT-
 tap OCT-
-expect size 2
+expect size 1
 wait 100
 shot size.png
 wait 2000
@@ -55,7 +55,7 @@ reboot
 wait 3200
 expect teeth 2
 expect rows 3
-expect size 2
+expect size 1
 expect jaws 3
 shot home-after.png
 # HOME held: goodbye, then asleep, then a press wakes it

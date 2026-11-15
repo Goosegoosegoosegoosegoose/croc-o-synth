@@ -5,7 +5,7 @@ A kid-friendly firmware idea for the M-VAVE FM-1 pocket synth: a crocodile teach
 This repository holds two things:
 
 - **`prototype/index.html`**: a click-through mock of the FM-1 panel in a browser, with a stand-in sound engine. This is where the lessons are designed.
-- **`app/`**: the real firmware, in C, built on [fm1-base](https://github.com/charlesvestal/fm1-base). It is early: the start-up greeting, the home croc, the Teeth lesson, the jaws, big and baby croc, and the goodbye. It runs in fm1-base's simulator and builds for the FM-1. **It has not been run on a real FM-1 yet.**
+- **`app/`**: the real firmware, in C, built on [fm1-base](https://github.com/charlesvestal/fm1-base). It is early: the start-up greeting, the home croc, the Teeth lesson, the jaws, small and big croc, and the goodbye. It runs in fm1-base's simulator and builds for the FM-1. **It has not been run on a real FM-1 yet.**
 
 ![The first firmware screens, from the simulator](docs/img/firmware-first-screens.png)
 
@@ -26,7 +26,7 @@ Open `prototype/index.html` in a browser. Tap the screen to wake the croc.
 | LFO | Tail wag | LFO speed, depth, target (pitch or filter) |
 | FX | Swamp echo and cave | Delay amount and time, reverb |
 | SEQ + PLAY | Lily pad steps | Eight-step sequencer |
-| OCT- / OCT+ | Baby or big croc | Octave |
+| OCT- / OCT+ | Small croc, croc, big croc | Octave: three of them, all inside the speaker's range |
 | PRESETS knob | Surprise | Five sounds plus her own, kept as My Croc |
 | ALGORITHM knob | Jaws | Filter cutoff |
 | SELECT knob | Hop speed | Tempo |

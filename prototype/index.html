@@ -96,7 +96,7 @@ canvas{display:block;width:100%;aspect-ratio:1;border-radius:9px}
       <dt>LFO</dt><dd>Tail wag: speed, depth, and target (pitch or filter)</dd>
       <dt>FX</dt><dd>Swamp echo and cave: delay amount and time, reverb</dd>
       <dt>SEQ, PLAY</dt><dd>Lily pad steps: an eight-step sequencer</dd>
-      <dt>OCT</dt><dd>Baby or big croc: pitch by octave</dd>
+      <dt>OCT</dt><dd>Small croc, croc, big croc: three octaves, all inside the FM-1 speaker's range</dd>
       <dt>PRESETS</dt><dd>Surprise: five sounds plus her own, kept as My Croc</dd>
       <dt>ALGORITHM</dt><dd>Jaws: filter cutoff, on every page</dd>
       <dt>SELECT</dt><dd>Hop speed: tempo</dd>
@@ -118,10 +118,10 @@ function now(){return performance.now()/1000;}
 
 /* ---------- settings ---------- */
 var SOUND=['teeth','uni','twin','size','jaws','atk','dec','sus','rel','wag','wagSize','wagTo','echo','echoTime','cave'];
-var RANGE={teeth:[0,2],uni:[1,3],twin:[0,4],size:[-2,2],jaws:[0,12],atk:[0,10],dec:[0,10],sus:[0,10],rel:[0,10],wag:[0,8],wagSize:[0,4],wagTo:[0,1],echo:[0,6],echoTime:[0,4],cave:[0,6]};
+var RANGE={teeth:[0,2],uni:[1,3],twin:[0,4],size:[-1,1],jaws:[0,12],atk:[0,10],dec:[0,10],sus:[0,10],rel:[0,10],wag:[0,8],wagSize:[0,4],wagTo:[0,1],echo:[0,6],echoTime:[0,4],cave:[0,6]};
 var PRESETS=[
   ['BABY CROC',   [0,1,2,-1,9, 0,4,7,2, 0,2,0, 1,2,1]],
-  ['SWAMP BASS',  [2,2,1,2,4,  0,5,6,2, 0,2,0, 0,2,0]],
+  ['SWAMP BASS',  [2,2,1,1,4,  0,5,6,2, 0,2,0, 0,2,0]],
   ['CHOMPER',     [1,1,2,0,10, 0,2,2,1, 0,2,0, 2,1,0]],
   ['SLEEPY YAWN', [0,3,2,0,5,  8,5,8,8, 2,1,0, 3,3,4]],
   ['WIGGLE TAIL', [1,1,2,-1,7, 1,4,7,3, 6,3,1, 2,2,1]]
@@ -176,7 +176,7 @@ function initAudio(){
 }
 function resume(){ if(ac&&ac.state!=='running'){ try{ac.resume();}catch(e){} } }
 function EV(){ var a=P.atk/10; return {a:0.005+a*a*0.8, d:0.05+P.dec/10*0.8, s:P.sus/10, r:0.05+P.rel/10*1.5}; }
-function freq(m){return 440*Math.pow(2,(m-69)/12)*Math.pow(2,-P.size);}
+function freq(m){return 440*Math.pow(2,(m-69)/12)*Math.pow(2,1-P.size);}  /* small F5..G7, croc F4..G6, big F3..G5 */
 function level(){return LEVEL[P.teeth]*[1,0.72,0.58][P.uni-1];}
 function spread(j,n){ var d=TWIN[P.twin]; return n===1?0:n===2?(j?d/2:-d/2):(j-1)*d; }
 function applyParams(){
@@ -457,7 +457,7 @@ function drawPage(pg,ta){
   if(pg==='home'){
     scene(150);
     text(crocName?'HI, '+crocName+'!':'HELLO!',120,24,27,C.ink,216);
-    var sS=[0.5,0.62,0.74,0.86,0.98][P.size+2], sx=120+19*sS, sy=150-8*sS;
+    var sS=[0.55,0.75,0.98][P.size+1], sx=120+19*sS, sy=150-8*sS;
     var jawS=(0.12+0.88*P.jaws/12)*(0.25+0.75*envJaw(ta));
     g.strokeStyle='rgba(255,255,255,.7)'; g.lineWidth=2;
     for(i=0;i<P.echo;i++){ var q2=((ta*0.35)+i/Math.max(1,P.echo))%1; g.globalAlpha=1-q2; g.beginPath(); g.ellipse(sx-20*sS,160,20+q2*90,3+q2*9,0,0,Math.PI*2); g.stroke(); }
@@ -534,10 +534,10 @@ function drawPage(pg,ta){
   }
   else if(pg==='size'){
     scene(150); v=P.size;
-    text(['BABY CROC','LITTLE CROC','CROC','BIG CROC','GIANT CROC'][v+2],120,24,27,C.ink,216);
-    var s=[0.45,0.6,0.75,0.9,1.05][v+2];
+    text(['SMALL CROC','CROC','BIG CROC'][v+1],120,24,27,C.ink,216);
+    var s=[0.55,0.8,1.05][v+1];
     crocMid(150-8*s,s,{jaw:0.2,tail:Math.sin(ta*4)*0.2,teeth:P.teeth,rows:P.uni,crook:P.twin});
-    panel(); label(['VERY HIGH','HIGH','MIDDLE','LOW','VERY LOW'][v+2]+' NOTES');
+    panel(); label(['HIGH','MIDDLE','LOW'][v+1]+' NOTES');
   }
   else if(pg==='jaws'){
     scene(150); v=P.jaws;

@@ -50,7 +50,7 @@ These are places where our design does the same job with the same control as Fel
 | SEQ | Sequencer: steps, pattern | Lily pad steps | Same area, our own design |
 | Note keys on the SEQ page | Enter notes into steps | Plant a note on the ringed lily pad | Same idea |
 | PLAY | Start and stop | Start and stop the croc hopping | Same |
-| OCT- / OCT+ | Octave down and up | Big croc and baby croc (octave) | Same job, renamed |
+| OCT- / OCT+ | Octave down and up | Big croc and small croc (octave, three steps) | Same job, renamed |
 | HOME | Home screen; hold for menu | Home croc; hold for goodbye | Press same, hold different |
 | GLO | Mixer, global, system; hold for mutes | Grown-ups; hold to name the croc | Similar press, hold different |
 | SCL, ARP, REC, SAVE | Scale, arpeggiator, record, save | Planned: Safe swamp, Croc hops, Croc remembers, Save | Planned, same areas |
@@ -64,7 +64,7 @@ These are standard synthesizer concepts, not anything taken from a particular fi
 | Oscillator wave shape (sine, saw, square) | Teeth: round, pointy, block |
 | Unison voices x1, x2, x3 | Rows of teeth |
 | Detune between unison voices | Crooked |
-| Octave | Baby croc to giant croc |
+| Octave | Small croc, croc, big croc |
 | Low-pass filter cutoff | Jaws |
 | Attack | Open |
 | Decay | Relax |

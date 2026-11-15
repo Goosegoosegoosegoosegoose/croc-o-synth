@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
  * Copyright 2026 goose */
 /* Croc-O-Synth: a crocodile teaches synth basics, one lesson a button. This first firmware has the start-up
- * greeting, the home croc that wears every setting, the Teeth lesson (EDIT), the jaws (ALGORITHM), big and baby croc
+ * greeting, the home croc that wears every setting, the Teeth lesson (EDIT), the jaws (ALGORITHM), small and big croc
  * (OCT), the goodbye (HOME held), and a placeholder for the lessons to come.
  * Part of the platform's unity build (base/device/unity.c, base/host/plat_host.c), after the platform: gfx.c and
  * announce.c are in scope. Written against the contract in app.h; see PROVENANCE.md for what came from where. */
@@ -35,7 +35,7 @@ static void sound_defaults(void)
 static int sound_ok(const sound_t *s)
 {
     return s->teeth >= 0 && s->teeth <= 2 && s->rows >= 1 && s->rows <= 3 && s->crook >= 0 && s->crook <= 4 &&
-           s->size >= -2 && s->size <= 2 && s->jaws >= 0 && s->jaws <= 12 && s->atk >= 0 && s->atk <= 10 &&
+           s->size >= -1 && s->size <= 1 && s->jaws >= 0 && s->jaws <= 12 && s->atk >= 0 && s->atk <= 10 &&
            s->dec >= 0 && s->dec <= 10 && s->sus >= 0 && s->sus <= 10 && s->rel >= 0 && s->rel <= 10;
 }
 
@@ -133,7 +133,7 @@ static void input(void)
             continue;
         ui.ov = OV_NONE;
         if (k == B_OCTDN || k == B_OCTUP) {  /* OCT- : a bigger croc, lower notes */
-            step(&snd.size, k == B_OCTDN ? 1 : -1, -2, 2);
+            step(&snd.size, k == B_OCTDN ? 1 : -1, -1, 1);
             overlay(OV_SIZE);
         } else if (k == B_HOME) {
             ui.page = PG_HOME;
@@ -221,7 +221,7 @@ static void croc_look(croc_t *c)             /* the croc as the sound has it */
 /* the whole picture; called once a band, with the canvas clipped to that band's rows */
 static void picture(float t)
 {
-    static const float SIZE_S[5] = {0.45f, 0.6f, 0.75f, 0.9f, 1.05f};
+    static const float SIZE_S[3] = {0.55f, 0.8f, 1.05f};
     croc_t c;
     m_reset();
     croc_look(&c);
@@ -259,16 +259,16 @@ static void picture(float t)
         return;
     }
     if (ui.ov == OV_SIZE) {
-        static const char *const NAME[5] = {"BABY CROC", "LITTLE CROC", "CROC", "BIG CROC", "GIANT CROC"};
-        static const char *const NOTES[5] = {"VERY HIGH NOTES", "HIGH NOTES", "MIDDLE NOTES", "LOW NOTES", "VERY LOW NOTES"};
-        float s = SIZE_S[snd.size + 2];
+        static const char *const NAME[3] = {"SMALL CROC", "CROC", "BIG CROC"};
+        static const char *const NOTES[3] = {"HIGH NOTES", "MIDDLE NOTES", "LOW NOTES"};
+        float s = SIZE_S[snd.size + 1];
         scene(150);
-        t_center(120, 8, NAME[snd.size + 2], K_INK, 224, 2);
+        t_center(120, 8, NAME[snd.size + 1], K_INK, 224, 2);
         c.jaw = 0.2f;
         c.tail = fm_sinf(t * 4.0f) * 0.2f;
         croc_mid(150.0f - 8.0f * s, s, &c);
         label_box();
-        t_center(120, 184, NOTES[snd.size + 2], K_CREAM, 200, 0);
+        t_center(120, 184, NOTES[snd.size + 1], K_CREAM, 200, 0);
         return;
     }
     if (ui.ov == OV_JAWS) {
@@ -292,7 +292,7 @@ static void picture(float t)
     }
     if (ui.page == PG_HOME) {
         static const char *const KN[4] = {"TEETH", 0, 0, 0};
-        float s = SIZE_S[snd.size + 2] * 0.93f;
+        float s = SIZE_S[snd.size + 1] * 0.93f;
         scene(150);
         t_center(120, 8, "HELLO!", K_INK, 224, 2);
         c.jaw = (0.12f + 0.88f * (float)snd.jaws / 12.0f) * (0.25f + 0.75f * env_jaw(t));

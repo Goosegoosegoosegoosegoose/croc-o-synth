@@ -12,7 +12,7 @@ typedef struct {
     int8_t teeth;                        /* 0 round (sine), 1 pointy (saw), 2 block (square) */
     int8_t rows;                         /* 1..3 oscillators */
     int8_t crook;                        /* 0..4: how far apart the rows are tuned */
-    int8_t size;                         /* -2..2: octaves down (a bigger croc sings lower) */
+    int8_t size;                         /* -1 small, 0 croc, 1 big: a bigger croc sings an octave lower */
     int8_t jaws;                         /* 0..12: the filter, closed to wide open */
     int8_t atk, dec, sus, rel;           /* 0..10 each: open, relax, hold, close */
 } sound_t;
@@ -177,7 +177,9 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
             stage = 3;
         if (!stage)
             continue;
-        base = 440.0f * fm_exp2f((float)(vc->note - 69) / 12.0f - (float)s.size) / SRATE;
+        /* the keys are F3..G5; the croc sings one octave above that, so every size stays in the speaker's range:
+         * small F5..G7, croc F4..G6, big F3..G5 */
+        base = 440.0f * fm_exp2f((float)(vc->note - 69) / 12.0f + 1.0f - (float)s.size) / SRATE;
         bend = fm_clampf(0.14f * fm_powf(350.0f / (base * SRATE), 0.75f), 0.14f, 0.6f);   /* lower notes, more harmonics */
         for (j = 0; j < NROW; j++) {
             float cents;
