@@ -86,3 +86,13 @@ wait 120
 key 7 up
 wait 1600
 wavstop
+# the lily pads hopping: the first tune, two seconds of it, for measuring the steps
+turn K1 -9
+turn K3 -9
+tap SEQ
+wav seq.wav
+tap PLAY
+wait 2400
+tap PLAY
+wait 400
+wavstop

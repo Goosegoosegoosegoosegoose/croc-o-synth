@@ -82,9 +82,9 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 
 | Work | Where | Status |
 | --- | --- | --- |
-| Lily pad sequencer (SEQ, PLAY), and the shared clock with the hop speed on SELECT | `main`, the original conversation | Next: build 8 |
-| Safe swamp, the scale mode (SCL) | branch `scale-mode`, a second conversation | Free to start now |
-| Croc hops, the arpeggiator (ARP) | branch `arp`, a second conversation | Start after build 8 is on `main`: it uses the same clock |
+| Lily pad sequencer (SEQ, PLAY), and the shared clock with the hop speed on SELECT | `main` | Done: build 8 |
+| Safe swamp, the scale mode (SCL) | branch `scale-mode` | In progress |
+| Croc hops, the arpeggiator (ARP) | branch `arp` | Can start: the clock is in `synth.c` (`seq_tick`) |
 | Croc remembers (REC), SAVE, challenges and stars | not started | |
 | The croc and background art | the owner | In progress |
 
@@ -92,4 +92,4 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 
 **Safe swamp (SCL).** Hooks are in place: `key_to_note()` in `app.c` is the one place a key becomes a note (return -1 for silence; each key remembers the note it started, so its note-off matches), and the saved record already has `scale`, `scale_home` and `scale_unsafe` (all 0 must mean every key as it is). Only the keys in a scale are "safe". Ideas agreed so far: the safe keys glow; a happy scale and a spooky one (major and minor). To decide with the owner: which scales, whether the root can move, and what an unsafe key does (stay silent, or slide to the nearest safe note). The lights can show three levels, so safe keys can glow dimly, the home note a little brighter, and held keys fully.
 
-**Croc hops (ARP).** Hold a few keys and the croc plays them one at a time: up, down, or random. It needs a clock; build 8 adds one for the sequencer, with the hop speed on the SELECT knob. Build on that clock, do not add a second one.
+**Croc hops (ARP).** Hold a few keys and the croc plays them one at a time: up, down, or random. It needs a clock: use the sequencer's (`seq_tick` in `synth.c`, with the hop speed on the SELECT knob); do not add a second one. The saved record has an `arp` byte waiting (0 must mean off).

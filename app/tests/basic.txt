@@ -1,7 +1,7 @@
 # Croc-O-Synth in the host simulator: ./build.sh --host, then
 #   app/build/host/crocosynth_host app/tests/basic.txt app/build/host
 # modes: 0 greeting, 1 playing, 2 goodbye, 3 asleep, 4 naming. pages: 0 home, 1 teeth, 2 coming soon, 3 envelope,
-# 4 tail wag, 5 grown-ups, 6 swamp echo
+# 4 tail wag, 5 grown-ups, 6 swamp echo, 7 lily pads
 wait 300
 expect mode 0
 shot boot.png
@@ -135,10 +135,57 @@ tap GLO
 wait 100
 expect page 5
 shot glo.png
-tap SEQ
+tap ARP
 wait 100
 expect page 2
 shot soon.png
+# lily pad steps: a key plants a note and moves on; fewer pads; an emptied pad; longer hops
+tap SEQ
+wait 100
+expect page 7
+expect pad0 60
+expect pads 8
+shot seq.png
+key 0 down
+key 0 up
+expect pad0 53
+expect cursor 1
+key 4 down
+key 4 up
+expect pad1 57
+expect cursor 2
+turn K4 -1
+expect pad2 -1
+turn K2 -2
+expect pads 6
+turn K3 1
+expect hop 3
+turn K1 9
+expect cursor 5
+key 2 down
+key 2 up
+expect pad5 55
+expect cursor 0
+# PLAY: the croc hops, and keeps hopping on another page
+tap PLAY
+expect playing 1
+wait 700
+expect step >-1
+shot seq-hopping.png
+tap HOME
+wait 400
+expect playing 1
+expect page 0
+# hop speed, from any page
+turn SELECT 3
+expect tempo 6
+wait 100
+shot tempo.png
+tap PLAY
+expect playing 0
+wait 600
+expect voices 0
+expect step -1
 # everything is kept across a power cycle
 tap HOME
 wait 3500
@@ -158,6 +205,13 @@ expect wag 4
 expect wagto 2
 expect echo 4
 expect cave 5
+expect pad0 53
+expect pad2 -1
+expect pad5 55
+expect pads 6
+expect hop 3
+expect tempo 6
+expect playing 0
 shot home-after.png
 # GLO held: rename; HOME finishes
 press GLO

@@ -4,7 +4,8 @@
  *   HOME       the croc, wearing the sound          EDIT   teeth: shape, rows, crooked
  *   ENV        snap or yawn: open, relax, hold, close      LFO    tail wag: speed, size, tickle
  *   FX         swamp echo, how far, the cave        PRESETS     five sounds and My Croc
- *   ALGORITHM  the jaws, on every page
+ *   SEQ        lily pad steps: eight pads, a note on each     PLAY   the croc hops across them
+ *   SELECT     hop speed                            ALGORITHM   the jaws, on every page
  *   OCT- OCT+  big croc, croc, small croc           HOME held: goodbye      GLO held: name the croc
  * Part of the platform's unity build (base/device/unity.c, base/host/plat_host.c), after the platform: gfx.c and
  * announce.c are in scope. Written against the contract in app.h; see PROVENANCE.md for what came from where. */
@@ -13,7 +14,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 7"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 8"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -150,8 +151,8 @@ void app_init(void)
 
 /* --------------------------------------------------------------------- UI --- */
 enum { M_BOOT, M_PLAY, M_BYE, M_OFF, M_NAME };
-enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX };
-enum { OV_NONE, OV_SIZE, OV_JAWS };
+enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ };
+enum { OV_NONE, OV_SIZE, OV_JAWS, OV_TEMPO };
 enum { F_NONE = -1, F_K1, F_K2, F_K3, F_K4 };   /* which of KNOB 1 to 4 was turned last on this page */
 
 static struct {
@@ -163,10 +164,11 @@ static struct {
     uint8_t key_note[NKEYS];             /* the note each held key started (its note-off must match) */
     uint8_t letter[NAME_LEN];            /* the name being spelled: 0 a space, 1..26 A..Z */
     uint8_t ncur;
+    uint8_t seq_cur;                     /* the lily pad a key plants its note on */
 } ui;
 
 static const char *const SOON_NAME[NB] = {"", "SAFE SWAMP", "", "", "", "", "", "SAVE", "CROC HOPS",
-                                          "LILY PAD STEPS", "PLAY", "CROC REMEMBERS", "", ""};
+                                          "", "", "CROC REMEMBERS", "", ""};
 
 /* The note a key plays: key 0 is F3 (MIDI 53). -1: the key stays silent. Safe swamp (the scale mode) changes this. */
 static int32_t key_to_note(uint32_t k) { return 53 + (int32_t)k; }
@@ -202,8 +204,10 @@ static void set_mode(int m)
     ui.t0 = plat_ms();
     ui.ov = OV_NONE;
     ui.home_t = ui.glo_t = 0;
-    if (m != M_PLAY)
+    if (m != M_PLAY) {
+        seq.playing = 0;                     /* the croc stops hopping */
         notes_off();
+    }
 }
 static void step(int8_t *v, int32_t d, int32_t lo, int32_t hi)
 {
@@ -222,6 +226,12 @@ static void go_page(int p)
 {
     ui.page = (uint8_t)p;
     ui.focus = F_NONE;
+}
+
+static void seq_changed(void)                /* a pad, the pad count, the hop or the speed changed: to the clock, and kept */
+{
+    seq_from_settings();
+    touched();
 }
 
 static void naming_start(void)
@@ -308,6 +318,11 @@ static void input(void)
         if (key_dn & bit) {
             int32_t note = key_to_note(k);
             ui.key_note[k] = note < 0 ? 0 : (uint8_t)note;
+            if (note >= 0 && ui.page == PG_SEQ && !ui.ov) {   /* on the lily pads a key also plants its note */
+                set.seq_note[ui.seq_cur] = (int8_t)note;
+                ui.seq_cur = (uint8_t)((ui.seq_cur + 1u) % set.seq_pads);
+                seq_changed();
+            }
             if (note >= 0) {
                 key_event(note, 1);
                 key_midi(note, 1);
@@ -336,10 +351,14 @@ static void input(void)
             go_page(PG_LFO);
         } else if (k == B_FX) {
             go_page(PG_FX);
+        } else if (k == B_SEQ) {
+            go_page(PG_SEQ);
+        } else if (k == B_PLAY) {            /* the croc hops, or stops, whatever page is up */
+            seq.playing = !seq.playing;
         } else if (k == B_GLO) {
             go_page(PG_GLO);
             ui.glo_t = now | 1u;
-        } else if (k != B_PLAY) {
+        } else {
             go_page(PG_SOON);
             ui.soon = (uint8_t)k;
         }
@@ -362,6 +381,14 @@ static void input(void)
         if (e[EN_ALGO]) {                    /* the jaws, on every page */
             step(&snd.jaws, e[EN_ALGO], 0, 12);
             overlay(OV_JAWS);
+        }
+        if (e[EN_SELECT]) {                  /* hop speed, on every page */
+            int32_t tp = clamp((int32_t)set.seq_tempo + e[EN_SELECT], 0, 8);
+            if (tp != set.seq_tempo) {
+                set.seq_tempo = (uint8_t)tp;
+                seq_changed();
+            }
+            overlay(OV_TEMPO);
         }
         if (e[EN_PRESET]) {                  /* the ready-made sounds, then My Croc */
             int32_t p = clamp((int32_t)set.preset + e[EN_PRESET], 0, NPRESET);
@@ -388,6 +415,21 @@ static void input(void)
                     step(&snd.wag, d, 0, 8);
                 } else {
                     step(&snd.echo, d, 0, 6);
+                }
+            } else if (ui.page == PG_SEQ) {
+                if (k == 0) {                /* which pad a key plants on */
+                    ui.seq_cur = (uint8_t)clamp((int32_t)ui.seq_cur + d, 0, set.seq_pads - 1);
+                } else if (k == 1) {         /* how many pads the croc hops */
+                    set.seq_pads = (uint8_t)clamp((int32_t)set.seq_pads + d, 2, SEQ_N);
+                    if (ui.seq_cur >= set.seq_pads)
+                        ui.seq_cur = (uint8_t)(set.seq_pads - 1u);
+                    seq_changed();
+                } else if (k == 2) {         /* how long each note lasts */
+                    set.seq_gate = (uint8_t)clamp((int32_t)set.seq_gate + d, 0, 4);
+                    seq_changed();
+                } else if (d < 0) {          /* turned left: this pad is emptied */
+                    set.seq_note[ui.seq_cur] = -1;
+                    seq_changed();
                 }
             } else if (ui.page == PG_FX) {
                 if (k == 0)
@@ -430,8 +472,13 @@ static void input(void)
     ui.keys = keys;
     ui.btn = btn;
     plat_glow(1);
-    plat_leds(ui.page == PG_HOME ? 1u << B_HOME : ui.page == PG_EDIT ? 1u << B_EDIT : ui.page == PG_ENV ? 1u << B_ENV
-              : ui.page == PG_LFO ? 1u << B_LFO : ui.page == PG_GLO ? 1u << B_GLO : ui.page == PG_FX ? 1u << B_FX : 1u << ui.soon, keys);
+    {                                        /* this page's button; PLAY while the croc hops; the key the pad is playing */
+        int8_t sn = seq_sounding;
+        uint32_t page_btn = ui.page == PG_HOME ? B_HOME : ui.page == PG_EDIT ? B_EDIT : ui.page == PG_ENV ? B_ENV
+                            : ui.page == PG_LFO ? B_LFO : ui.page == PG_GLO ? B_GLO : ui.page == PG_FX ? B_FX
+                            : ui.page == PG_SEQ ? B_SEQ : ui.soon;
+        plat_leds(1u << page_btn | (seq.playing ? 1u << B_PLAY : 0u), keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u));
+    }
 }
 
 void app_input_only(void) { input(); }
@@ -470,6 +517,82 @@ static void croc_look(croc_t *c)             /* the croc as the sound has it */
     c->wave_ph = 0.0f;
     c->tail_len = 1.0f;
     c->puff = 0.0f;
+}
+
+static void num_text(char *b, int32_t v, const char *before, const char *after)   /* small whole numbers into a line */
+{
+    while (*before)
+        *b++ = *before++;
+    if (v >= 10)
+        *b++ = (char)('0' + v / 10);
+    *b++ = (char)('0' + v % 10);
+    while (*after)
+        *b++ = *after++;
+    *b = 0;
+}
+
+static void picture_seq(float t)
+{
+    static const char *const KN[4] = {"PAD", "HOW MANY", "HOP", "EMPTY"};
+    static const char *const NOTE[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    static const char *const HOPS[5] = {"TINY HOPS", "SHORT HOPS", "HOPS", "LONG HOPS", "SLIDING"};
+    char buf[24];
+    const char *what, *now;
+    croc_t c;
+    int32_t i, st = seq_step, hx = 0, hy = 0;
+    (void)t;
+    scene(60);
+    t_center(120, 2, "LILY PAD STEPS", K_INK, 228, 1);
+    if (ui.focus == F_K1) {
+        what = "WHICH PAD YOU PLANT ON";
+        num_text(buf, ui.seq_cur + 1, "PAD ", "");
+        now = buf;
+    } else if (ui.focus == F_K2) {
+        what = "HOW MANY PADS THE CROC HOPS";
+        num_text(buf, set.seq_pads, "", " PADS");
+        now = buf;
+    } else if (ui.focus == F_K3) {
+        what = "HOW LONG EACH NOTE LASTS";
+        now = HOPS[set.seq_gate];
+    } else if (ui.focus == F_K4) {
+        what = "TURN LEFT TO EMPTY THIS PAD";
+        now = set.seq_note[ui.seq_cur] < 0 ? "EMPTY" : "HAS A NOTE";
+    } else {
+        what = "PRESS A KEY TO PLANT A NOTE";
+        now = seq.playing ? "HOP HOP HOP!" : "PRESS PLAY TO HOP";
+    }
+    t_small(120, 27, what, K_INK);
+    t_center(120, 41, now, K_CROCD, 220, 0);
+    m_reset();
+    for (i = 0; i < SEQ_N; i++) {            /* two rows of four pads; the croc goes along the top, then the bottom */
+        float px = 36.0f + (float)(i % 4) * 56.0f, py = i < 4 ? 106.0f : 164.0f;
+        int on = i < set.seq_pads, hot = on && i == st;
+        if (on && i == ui.seq_cur) {         /* the pad a key plants on: a ring */
+            s_ellipse(px, py, 28.0f, 18.0f, K_MOUTH);
+            s_ellipse(px, py, 25.0f, 15.0f, K_WATER);
+        }
+        s_ellipse(px, py, 23.0f, 13.0f, !on ? RGB(98, 186, 196) : hot ? RGB(155, 232, 115) : RGB(79, 174, 69));
+        s_tri(px + 4.0f, py, px + 25.0f, py - 6.5f, px + 25.0f, py + 6.5f, K_WATER);
+        if (on && set.seq_note[i] >= 0) {
+            const char *nm = NOTE[set.seq_note[i] % 12];
+            cv_text((int32_t)px - 6 - text_w(&FONT_B, nm) / 2, (int32_t)py - 8, &FONT_B, nm, RGB(13, 51, 25));
+        }
+        if (hot) {
+            hx = (int32_t)px;
+            hy = (int32_t)py;
+        }
+    }
+    croc_look(&c);
+    if (st >= 0 && hx) {                     /* hopping: up and down once a step, mouth open on a note */
+        uint32_t len = seq_len, pos = seq_pos;
+        float f = len ? fm_clampf((float)pos / (float)len, 0.0f, 1.0f) : 0.0f;
+        c.jaw = set.seq_note[st] >= 0 ? 0.7f : 0.1f;
+        croc_draw((float)hx + 8.0f, (float)hy - 15.0f - fm_sinf(f * 3.14159f) * 9.0f, 0.3f, &c);
+    } else {                                 /* waiting on the first pad */
+        c.sleep = 1;
+        croc_draw(44.0f, 91.0f, 0.3f, &c);
+    }
+    strip(KN, ui.focus);
 }
 
 static void picture_name(float t)
@@ -567,6 +690,17 @@ static void picture(float t)
         croc_mid(150.0f - 8.0f * s, s, &c);
         label_box();
         t_center(120, 184, NOTES[snd.size + 1], K_CREAM, 200, 0);
+        return;
+    }
+    if (ui.ov == OV_TEMPO) {
+        float bps = (60.0f + 15.0f * (float)set.seq_tempo) / 60.0f;
+        scene(150);
+        t_center(120, 8, "HOP SPEED", K_INK, 224, 2);
+        c.jaw = 0.2f;
+        croc_mid(140.0f - fm_fabsf(fm_sinf(t * 3.14159f * bps)) * 10.0f, 0.85f, &c);
+        label_box();
+        t_center(120, 184, set.seq_tempo <= 1 ? "SLOW" : set.seq_tempo <= 3 ? "WALKING" : set.seq_tempo <= 5 ? "QUICK" : "ZOOM!",
+                 K_CREAM, 200, 0);
         return;
     }
     if (ui.ov == OV_JAWS) {
@@ -725,6 +859,10 @@ static void picture(float t)
         strip(KN, ui.focus);
         return;
     }
+    if (ui.page == PG_SEQ) {
+        picture_seq(t);
+        return;
+    }
     if (ui.page == PG_FX) {
         static const char *const KN[4] = {"ECHO", "FAR", "CAVE", 0};
         static const char *const FAR[5] = {"VERY NEAR", "NEAR", "MIDDLE", "FAR", "VERY FAR"};
@@ -826,7 +964,7 @@ void app_frame(void)
     }
     if (ui.mode == M_BYE && now - ui.t0 > 5000u)
         set_mode(M_OFF);
-    if (ui.mode == M_PLAY && now - ui.last_touch > 180000u && !voices_sounding())   /* three quiet minutes */
+    if (ui.mode == M_PLAY && now - ui.last_touch > 180000u && !voices_sounding() && !seq.playing)   /* three quiet minutes */
         set_mode(M_BYE);
     if (ui.ov && now >= ui.ov_until)
         ui.ov = OV_NONE;
@@ -866,6 +1004,20 @@ int app_expect(const char *what, int *got)
         *got = voices_sounding();
     else if (!strcmp(what, "preset"))
         *got = set.preset;
+    else if (!strcmp(what, "playing"))
+        *got = seq.playing;
+    else if (!strcmp(what, "step"))
+        *got = seq_step;
+    else if (!strcmp(what, "pads"))
+        *got = set.seq_pads;
+    else if (!strcmp(what, "cursor"))
+        *got = ui.seq_cur;
+    else if (!strcmp(what, "hop"))
+        *got = set.seq_gate;
+    else if (!strcmp(what, "tempo"))
+        *got = set.seq_tempo;
+    else if (!strncmp(what, "pad", 3) && what[3] >= '0' && what[3] < '0' + SEQ_N && !what[4])   /* padN: pad N's note */
+        *got = set.seq_note[what[3] - '0'];
     else if (!strcmp(what, "named"))
         *got = set.name[0] != 0;
     else if (!strncmp(what, "name", 4) && what[4] >= '0' && what[4] < '0' + NAME_LEN)   /* nameN: letter N's code */

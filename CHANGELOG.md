@@ -6,6 +6,18 @@ All of these are development builds, so the FM-1 reports the same identity for e
 
 All dates are 2026-11-15.
 
+## Build 8: lily pad steps
+
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
+- **Added:**
+  - **SEQ**, lily pad steps: eight lily pads, a note on each. Press a key to plant its note on the ringed pad; the ring moves on. Knob 1 picks the pad, knob 2 how many pads the croc hops (2 to 8), knob 3 how long each note lasts (tiny hops to sliding), knob 4 turned left empties the pad. Each knob has its line and readout
+  - **PLAY**: the croc hops across the pads, round and round, on any page; PLAY lights while it hops and the key of the note being played lights up. It starts with a little tune already planted
+  - **SELECT knob**: hop speed (60 to 180 beats a minute), on any page
+  - the pads, their count, the hop and the speed are saved
+- **Under the hood:** a clock in the audio interrupt (for the arpeggiator to share); every note-on and note-off now happens in that interrupt, so keys and pads can no longer grab the same voice at once; the saved record has room for the lessons still to come, and saves from builds 5, 6 and 7 carry over.
+- **Checked:** simulator checks pass (planting, emptying, pad count, PLAY across pages, speed, all kept across a power cycle). Measured: at the default speed the notes land 0.285 s apart against 0.286 s expected, within 4 ms of each other. Saves made by builds 6 and 7 load with the croc's name and sound intact.
+- **On the FM-1:** not reported yet.
+
 ## Build 7: swamp echo and the cave
 
 - Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
