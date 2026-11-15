@@ -6,6 +6,21 @@ All of these are development builds, so the FM-1 reports the same identity for e
 
 All dates are 2026-11-15.
 
+## Build 7: swamp echo and the cave
+
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
+- **Added, on FX:**
+  - knob 1 **ECHO**: how many times the swamp answers (the delay's amount and feedback). Smaller crocs appear further off, one for each answer
+  - knob 2 **FAR**: how far away the echo is (the delay time, 0.18 to 0.6 s). It glides like a tape when turned, so there are no clicks
+  - knob 3 **CAVE**: how big the cave is (reverb). The sky darkens and rock walls close in from the sides
+  - each knob has its line and readout, as on the other lessons
+  - HOME's knob 4 is ECHO; the five presets have their echo and cave settings
+- **Changed:** installing from now on is a double-click (`tools/update-croc.bat`); each build is also published as the repository's latest release.
+- **Kept:** the croc's name and My Croc from builds 5 and 6 carry over (the saved record grew; the old one is read once and saved again in the new form).
+- **Checked:** simulator checks pass, with echo and cave added. Measured: each echo is about half as loud as the one before, 0.34 s apart at the middle setting; the cave's tail fades smoothly over about 0.7 s. A build 6 save loaded into this build kept its name and sound.
+- **Caught before release:** the first version fed the echo back into the filter and grew louder with each repeat. The recordings showed it; fixed.
+- **On the FM-1:** not reported yet. This build uses the most memory and processing so far (a 0.6 s delay line and a small reverb), so it is the one to listen to for crackle.
+
 ## Build 6: tickle
 
 - Commit: the one that adds this entry. Download: the matching **Build firmware** run on the Actions tab.
@@ -17,7 +32,7 @@ All dates are 2026-11-15.
   - the home croc shows the same things
 - **Note:** a My Croc sound saved in build 5 with the jaw wobble now tickles the belly; turn TICKLE one more step to get the snoot back.
 - **Checked:** simulator checks pass. Measured: tickling the belly swings the loudness about 8 times at a big wag and leaves pitch and brightness alone; the tail moves the pitch; the snoot sweeps the brightness.
-- **On the FM-1:** not reported yet.
+- **On the FM-1:** reported as great so far.
 
 ## Build 5: envelope, tail wag, presets, the croc's name
 

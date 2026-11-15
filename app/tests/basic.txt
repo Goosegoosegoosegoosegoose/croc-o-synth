@@ -1,7 +1,7 @@
 # Croc-O-Synth in the host simulator: ./build.sh --host, then
 #   app/build/host/crocosynth_host app/tests/basic.txt app/build/host
 # modes: 0 greeting, 1 playing, 2 goodbye, 3 asleep, 4 naming. pages: 0 home, 1 teeth, 2 coming soon, 3 envelope,
-# 4 tail wag, 5 grown-ups
+# 4 tail wag, 5 grown-ups, 6 swamp echo
 wait 300
 expect mode 0
 shot boot.png
@@ -98,12 +98,28 @@ expect wagto 0
 wait 100
 shot lfo-tail.png
 turn K3 2
+# swamp echo and the cave
+tap FX
+expect page 6
+turn K1 3
+expect echo 4
+wait 100
+shot fx-echo.png
+turn K2 2
+expect far 4
+wait 100
+shot fx-far.png
+turn K3 4
+expect cave 5
+wait 100
+shot fx-cave.png
 # the ready-made sounds, and My Croc comes back
 turn PRESET -9
 expect preset 0
 expect page 0
 expect teeth 0
 expect atk 0
+expect echo 1
 wait 100
 shot preset.png
 turn PRESET 2
@@ -140,6 +156,8 @@ expect jaws 3
 expect atk 6
 expect wag 4
 expect wagto 2
+expect echo 4
+expect cave 5
 shot home-after.png
 # GLO held: rename; HOME finishes
 press GLO

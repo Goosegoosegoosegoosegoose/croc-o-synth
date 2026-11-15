@@ -68,3 +68,21 @@ wait 1200
 key 7 up
 wait 300
 wavstop
+# the swamp echo alone, then the cave alone: one short note each
+tap FX
+turn K3 -9
+turn K1 9
+wav echo.wav
+key 7 down
+wait 120
+key 7 up
+wait 1600
+wavstop
+turn K1 -9
+turn K3 9
+wav cave.wav
+key 7 down
+wait 120
+key 7 up
+wait 1600
+wavstop

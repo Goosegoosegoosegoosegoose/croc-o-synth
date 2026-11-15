@@ -3,7 +3,8 @@
 /* Croc-O-Synth: a crocodile teaches synth basics, one lesson a button.
  *   HOME       the croc, wearing the sound          EDIT   teeth: shape, rows, crooked
  *   ENV        snap or yawn: open, relax, hold, close      LFO    tail wag: speed, size, tickle
- *   PRESETS    five sounds and My Croc              ALGORITHM   the jaws, on every page
+ *   FX         swamp echo, how far, the cave        PRESETS     five sounds and My Croc
+ *   ALGORITHM  the jaws, on every page
  *   OCT- OCT+  big croc, croc, small croc           HOME held: goodbye      GLO held: name the croc
  * Part of the platform's unity build (base/device/unity.c, base/host/plat_host.c), after the platform: gfx.c and
  * announce.c are in scope. Written against the contract in app.h; see PROVENANCE.md for what came from where. */
@@ -12,12 +13,20 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 6"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 7"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
 #define NPRESET 5                        /* then one more: My Croc */
-#define SET_MAGIC 0x43524F32u            /* "CRO2": the saved record; another magic loads the defaults */
+#define SET_MAGIC 0x43524F33u            /* "CRO3": the saved record; another magic loads the defaults */
+#define SET_MAGIC_V2 0x43524F32u         /* "CRO2": builds 5 and 6, read once and carried over */
+typedef struct {
+    uint32_t magic;
+    int8_t s[12];                        /* that sound: teeth .. wag_to */
+    uint8_t preset;
+    char name[9];
+    uint8_t rsv[2];
+} settings_v2_t;
 typedef struct {
     uint32_t magic;
     sound_t mine;                        /* My Croc: the last sound she made herself */
@@ -29,19 +38,20 @@ static settings_t set;
 static uint32_t dirty_at;                /* something changed at this time and is not saved yet (0: saved) */
 
 static const char *const PRESET_NAME[NPRESET] = {"BABY CROC", "SWAMP BASS", "CHOMPER", "SLEEPY YAWN", "WIGGLE TAIL"};
-/*                                      teeth rows crook size jaws  atk dec sus rel  wag size to */
-static const sound_t PRESET[NPRESET] = {{0, 1, 2, -1, 9, 0, 4, 7, 2, 0, 2, 0},
-                                        {2, 2, 1, 1, 4, 0, 5, 6, 2, 0, 2, 0},
-                                        {1, 1, 2, 0, 10, 0, 2, 2, 1, 0, 2, 0},
-                                        {0, 3, 2, 0, 5, 8, 5, 8, 8, 2, 1, 0},
-                                        {1, 1, 2, -1, 7, 1, 4, 7, 3, 6, 3, 2}};
+/*                                      teeth rows crook size jaws  atk dec sus rel  wag size to  echo far cave */
+static const sound_t PRESET[NPRESET] = {{0, 1, 2, -1, 9, 0, 4, 7, 2, 0, 2, 0, 1, 2, 1, {0}},
+                                        {2, 2, 1, 1, 4, 0, 5, 6, 2, 0, 2, 0, 0, 2, 0, {0}},
+                                        {1, 1, 2, 0, 10, 0, 2, 2, 1, 0, 2, 0, 2, 1, 0, {0}},
+                                        {0, 3, 2, 0, 5, 8, 5, 8, 8, 2, 1, 0, 3, 3, 4, {0}},
+                                        {1, 1, 2, -1, 7, 1, 4, 7, 3, 6, 3, 2, 2, 2, 1, {0}}};
 
 static int sound_ok(const sound_t *s)
 {
     return s->teeth >= 0 && s->teeth <= 2 && s->rows >= 1 && s->rows <= 3 && s->crook >= 0 && s->crook <= 4 &&
            s->size >= -1 && s->size <= 1 && s->jaws >= 0 && s->jaws <= 12 && s->atk >= 0 && s->atk <= 10 &&
            s->dec >= 0 && s->dec <= 10 && s->sus >= 0 && s->sus <= 10 && s->rel >= 0 && s->rel <= 10 &&
-           s->wag >= 0 && s->wag <= 8 && s->wag_size >= 0 && s->wag_size <= 4 && s->wag_to >= 0 && s->wag_to <= 2;
+           s->wag >= 0 && s->wag <= 8 && s->wag_size >= 0 && s->wag_size <= 4 && s->wag_to >= 0 && s->wag_to <= 2 &&
+           s->echo >= 0 && s->echo <= 6 && s->echo_far >= 0 && s->echo_far <= 4 && s->cave >= 0 && s->cave <= 6;
 }
 static int name_ok(const char *n)
 {
@@ -54,21 +64,44 @@ static int name_ok(const char *n)
 
 void app_init(void)
 {
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC ||
-        !sound_ok(&set.mine) || set.preset > NPRESET || !name_ok(set.name)) {
-        int i;
-        set.magic = SET_MAGIC;
+    static union {
+        settings_t now;
+        settings_v2_t v2;
+    } ld;
+    int n = plat_store_load(OBJ_SETTINGS, &ld, sizeof ld), i, ok = 0;
+    fx_clear();
+    if (n == (int)sizeof(settings_t) && ld.now.magic == SET_MAGIC) {
+        set = ld.now;
+        ok = 1;
+    } else if (n == (int)sizeof(settings_v2_t) && ld.v2.magic == SET_MAGIC_V2) {   /* builds 5 and 6: her name and
+                                                                                    * her sound come along */
+        int8_t *d = (int8_t *)&set.mine;
+        set.mine = PRESET[0];
+        for (i = 0; i < 12; i++)
+            d[i] = ld.v2.s[i];
+        set.mine.echo = 0;
+        set.mine.echo_far = 2;
+        set.mine.cave = 0;
+        set.preset = ld.v2.preset;
+        for (i = 0; i <= NAME_LEN; i++)
+            set.name[i] = ld.v2.name[i];
+        set.name[NAME_LEN] = 0;
+        ok = 1;
+        dirty_at = 1u;                       /* saved again in the new form */
+    }
+    if (!ok || !sound_ok(&set.mine) || set.preset > NPRESET || !name_ok(set.name)) {
         set.mine = PRESET[0];
         set.preset = 0;
         for (i = 0; i <= NAME_LEN; i++)
             set.name[i] = 0;
     }
+    set.magic = SET_MAGIC;
     snd = set.preset < NPRESET ? PRESET[set.preset] : set.mine;
 }
 
 /* --------------------------------------------------------------------- UI --- */
 enum { M_BOOT, M_PLAY, M_BYE, M_OFF, M_NAME };
-enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO };
+enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX };
 enum { OV_NONE, OV_SIZE, OV_JAWS };
 enum { F_NONE = -1, F_K1, F_K2, F_K3, F_K4 };   /* which of KNOB 1 to 4 was turned last on this page */
 
@@ -82,7 +115,7 @@ static struct {
     uint8_t ncur;
 } ui;
 
-static const char *const SOON_NAME[NB] = {"SWAMP ECHO", "SAFE SWAMP", "", "", "", "", "", "SAVE", "CROC HOPS",
+static const char *const SOON_NAME[NB] = {"", "SAFE SWAMP", "", "", "", "", "", "SAVE", "CROC HOPS",
                                           "LILY PAD STEPS", "PLAY", "CROC REMEMBERS", "", ""};
 
 void app_say(const char *a, const char *b)
@@ -244,6 +277,8 @@ static void input(void)
             go_page(PG_ENV);
         } else if (k == B_LFO) {
             go_page(PG_LFO);
+        } else if (k == B_FX) {
+            go_page(PG_FX);
         } else if (k == B_GLO) {
             go_page(PG_GLO);
             ui.glo_t = now | 1u;
@@ -295,8 +330,17 @@ static void input(void)
                 } else if (k == 2) {
                     step(&snd.wag, d, 0, 8);
                 } else {
-                    used = 0;
+                    step(&snd.echo, d, 0, 6);
                 }
+            } else if (ui.page == PG_FX) {
+                if (k == 0)
+                    step(&snd.echo, d, 0, 6);
+                else if (k == 1)
+                    step(&snd.echo_far, d, 0, 4);
+                else if (k == 2)
+                    step(&snd.cave, d, 0, 6);
+                else
+                    used = 0;
             } else if (ui.page == PG_EDIT) {
                 if (k == 0)
                     step(&snd.teeth, d, 0, 2);
@@ -330,7 +374,7 @@ static void input(void)
     ui.btn = btn;
     plat_glow(1);
     plat_leds(ui.page == PG_HOME ? 1u << B_HOME : ui.page == PG_EDIT ? 1u << B_EDIT : ui.page == PG_ENV ? 1u << B_ENV
-              : ui.page == PG_LFO ? 1u << B_LFO : ui.page == PG_GLO ? 1u << B_GLO : 1u << ui.soon, keys);
+              : ui.page == PG_LFO ? 1u << B_LFO : ui.page == PG_GLO ? 1u << B_GLO : ui.page == PG_FX ? 1u << B_FX : 1u << ui.soon, keys);
 }
 
 void app_input_only(void) { input(); }
@@ -488,7 +532,7 @@ static void picture(float t)
         return;
     }
     if (ui.page == PG_HOME) {
-        static const char *const KN[4] = {"TEETH", "SNAP", "WAG", 0};
+        static const char *const KN[4] = {"TEETH", "SNAP", "WAG", "ECHO"};
         float s = SIZE_S[snd.size + 1] * 0.93f, w = wag_now(t);
         scene(150);
         if (set.name[0])
@@ -624,6 +668,54 @@ static void picture(float t)
         strip(KN, ui.focus);
         return;
     }
+    if (ui.page == PG_FX) {
+        static const char *const KN[4] = {"ECHO", "FAR", "CAVE", 0};
+        static const char *const FAR[5] = {"VERY NEAR", "NEAR", "MIDDLE", "FAR", "VERY FAR"};
+        /* the echo crocs, further off each time: where, and how small */
+        static const float EX[3] = {62.0f, 176.0f, 80.0f}, EY[3] = {130.0f, 117.0f, 106.0f}, ES[3] = {0.34f, 0.24f, 0.17f};
+        int32_t i, n = snd.echo > 4 ? 3 : (snd.echo + 1) / 2, dark = snd.cave >= 3;
+        uint16_t sky = RGB(200 - snd.cave * 22, 241 - snd.cave * 30, 230 - snd.cave * 18), ink = dark ? K_CREAM : K_INK;
+        const char *what, *now;
+        float far = 1.0f - (float)snd.echo_far * 0.09f;
+        cv_rect(0, 0, 240, 92, sky);         /* the sky darkens as the cave closes in */
+        cv_rect(0, 92, 240, 148, K_WATER);
+        cv_rect(0, 92, 240, 3, K_FOAM);
+        m_reset();
+        for (i = 0; i < 2 && snd.cave; i++) {    /* the cave's walls, in from each side */
+            float wdt = 6.0f + (float)snd.cave * 4.0f, x0 = i ? 240.0f : 0.0f, sg = i ? -1.0f : 1.0f;
+            uint16_t rock = RGB(58, 46, 84);
+            cv_rect(i ? 240 - (int32_t)wdt : 0, 0, (int32_t)wdt, 95, rock);
+            s_tri(x0 + sg * wdt, 0.0f, x0 + sg * (wdt + 14.0f), 0.0f, x0 + sg * wdt, 34.0f, rock);
+            s_tri(x0 + sg * wdt, 40.0f, x0 + sg * (wdt + 9.0f), 66.0f, x0 + sg * wdt, 95.0f, rock);
+        }
+        if (ui.focus == F_K2) {
+            what = "HOW FAR AWAY THE ECHO IS";
+            now = FAR[snd.echo_far];
+        } else if (ui.focus == F_K3) {
+            what = "HOW BIG THE CAVE IS";
+            now = snd.cave == 0 ? "NO CAVE" : snd.cave < 3 ? "SMALL CAVE" : snd.cave < 5 ? "BIG CAVE" : "GIANT CAVE";
+        } else {
+            what = "HOW MANY TIMES THE SWAMP ANSWERS";
+            now = snd.echo == 0 ? "NO ECHO" : n == 1 ? "ONE ECHO" : n == 2 ? "TWO ECHOES" : "LOTS OF ECHOES";
+        }
+        t_center(120, 4, ui.focus == F_K3 ? "CAVE" : "SWAMP ECHO", ink, 196, 2);
+        t_small(120, 38, what, ink);
+        t_center(120, 54, now, dark ? K_SUN : K_CROCD, 190, 0);
+        c.jaw = 0.5f;
+        for (i = n - 1; i >= 0; i--)         /* the answers: the same croc, smaller and further away */
+            croc_draw(EX[i], EY[i] + (1.0f - far) * 30.0f * (float)(2 - i) * 0.4f, ES[i] * far, &c);
+        m_reset();
+        for (i = 0; i < 2 && snd.echo; i++) {    /* ripples under the croc */
+            float q = t * 0.35f + (float)i * 0.5f;
+            q -= fm_floorf(q);
+            s_ellipse(140.0f, 163.0f, 30.0f + q * 60.0f, 4.0f + q * 6.0f, K_FOAM);
+            s_ellipse(140.0f, 163.0f, 28.0f + q * 60.0f, 3.0f + q * 5.5f, K_WATER);
+        }
+        c.tail = fm_sinf(t * 3.0f) * 0.2f;
+        croc_draw(150.0f, 150.0f, 0.6f, &c);
+        strip(KN, ui.focus);
+        return;
+    }
     if (ui.page == PG_GLO) {
         scene(150);
         t_center(120, 8, "GROWN-UPS", K_INK, 228, 2);
@@ -701,7 +793,8 @@ int app_expect(const char *what, int *got)
         int8_t *v;
     } S[] = {{"teeth", &snd.teeth}, {"rows", &snd.rows}, {"crook", &snd.crook}, {"size", &snd.size},
              {"jaws", &snd.jaws}, {"atk", &snd.atk}, {"dec", &snd.dec}, {"sus", &snd.sus},
-             {"rel", &snd.rel}, {"wag", &snd.wag}, {"wagsize", &snd.wag_size}, {"wagto", &snd.wag_to}};
+             {"rel", &snd.rel}, {"wag", &snd.wag}, {"wagsize", &snd.wag_size}, {"wagto", &snd.wag_to},
+             {"echo", &snd.echo}, {"far", &snd.echo_far}, {"cave", &snd.cave}};
     unsigned i;
     for (i = 0; i < sizeof S / sizeof S[0]; i++)
         if (!strcmp(what, S[i].name)) {

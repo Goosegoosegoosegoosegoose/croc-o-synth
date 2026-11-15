@@ -18,6 +18,10 @@ typedef struct {
     int8_t wag;                          /* 0 still, 1..8: the tail wag's speed (the LFO) */
     int8_t wag_size;                     /* 0..4: how far it wags */
     int8_t wag_to;                       /* what the wag tickles: 0 the tail (pitch), 1 the belly (volume), 2 the snoot (filter) */
+    int8_t echo;                         /* 0..6: how many times the swamp answers */
+    int8_t echo_far;                     /* 0..4: how far away the echo is (its delay) */
+    int8_t cave;                         /* 0..6: how big the cave is (reverb) */
+    int8_t rsv[6];                       /* room for more, so the saved record keeps its size */
 } sound_t;
 static sound_t snd;
 
@@ -33,6 +37,69 @@ static voice_t vv[NV];
 static uint32_t note_clock;
 static float flt_ic1, flt_ic2, gain_now;
 static float mixbuf[APP_BLOCK];
+
+/* the swamp echo: one delay line, up to 0.6 s, kept as 16-bit in the platform's big pool (not in the small RAM) */
+#define DL_N 27000
+static int16_t dl_buf[DL_N] __attribute__((section(".pool")));
+static uint32_t dl_w;
+static float dl_now = 8000.0f, echo_wet, echo_fb, cave_g;
+static const float ECHO_SEC[5] = {0.18f, 0.26f, 0.34f, 0.45f, 0.6f};
+/* the cave: four combs and two all-passes (the classic small reverb), also in the pool */
+#define RV_C0 1116
+#define RV_C1 1188
+#define RV_C2 1277
+#define RV_C3 1356
+#define RV_A0 556
+#define RV_A1 441
+static float rv_c0[RV_C0] __attribute__((section(".pool"))), rv_c1[RV_C1] __attribute__((section(".pool"))),
+             rv_c2[RV_C2] __attribute__((section(".pool"))), rv_c3[RV_C3] __attribute__((section(".pool"))),
+             rv_a0[RV_A0] __attribute__((section(".pool"))), rv_a1[RV_A1] __attribute__((section(".pool")));
+static uint32_t rv_i[6];
+static float rv_lp[4];
+
+static void fx_clear(void)                   /* the pool is not cleared at power-on */
+{
+    uint32_t i;
+    for (i = 0; i < DL_N; i++)
+        dl_buf[i] = 0;
+    for (i = 0; i < RV_C0; i++)
+        rv_c0[i] = 0.0f;
+    for (i = 0; i < RV_C1; i++)
+        rv_c1[i] = 0.0f;
+    for (i = 0; i < RV_C2; i++)
+        rv_c2[i] = 0.0f;
+    for (i = 0; i < RV_C3; i++)
+        rv_c3[i] = 0.0f;
+    for (i = 0; i < RV_A0; i++)
+        rv_a0[i] = 0.0f;
+    for (i = 0; i < RV_A1; i++)
+        rv_a1[i] = 0.0f;
+}
+
+static inline float rv_comb(float *buf, uint32_t len, uint32_t *idx, float *lp, float in)
+{
+    float y = buf[*idx];
+    *lp = y * 0.75f + *lp * 0.25f;           /* the cave's walls soak up the brightest part */
+    buf[*idx] = in + *lp * 0.82f;
+    if (++*idx >= len)
+        *idx = 0;
+    return y;
+}
+static inline float rv_allpass(float *buf, uint32_t len, uint32_t *idx, float in)
+{
+    float y = buf[*idx];
+    buf[*idx] = in + y * 0.5f;
+    if (++*idx >= len)
+        *idx = 0;
+    return y - in;
+}
+static inline float cave_tick(float in)
+{
+    float o = rv_comb(rv_c0, RV_C0, &rv_i[0], &rv_lp[0], in) + rv_comb(rv_c1, RV_C1, &rv_i[1], &rv_lp[1], in) +
+              rv_comb(rv_c2, RV_C2, &rv_i[2], &rv_lp[2], in) + rv_comb(rv_c3, RV_C3, &rv_i[3], &rv_lp[3], in);
+    o = rv_allpass(rv_a0, RV_A0, &rv_i[4], o * 0.25f);
+    return rv_allpass(rv_a1, RV_A1, &rv_i[5], o);
+}
 
 static const float CROOK_CENTS[5] = {0.0f, 6.0f, 12.0f, 20.0f, 30.0f};
 static const float WAVE_LEVEL[3] = {0.62f, 0.42f, 0.35f};
@@ -134,6 +201,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float rg0[NROW], rg1[NROW], ww0[3], ww1[3];
     int act[NROW], wact[3];
     float lfo0 = lfo_prev, lfo1, pm0 = pm_prev, pm1, am0 = am_prev, am1, jw_cents;
+    float wet_t = (float)s.echo / 6.0f * 0.5f, fb_t = s.echo ? 0.25f + (float)s.echo * 0.05f : 0.0f;
+    float dl_t = ECHO_SEC[s.echo_far] * SRATE, cave_t = (float)s.cave / 6.0f * 0.55f;
     midi_in();
     if (n > APP_BLOCK)
         n = APP_BLOCK;
@@ -269,6 +338,30 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         v2 = flt_ic2 + a2 * flt_ic1 + a3 * v3;
         flt_ic1 = 2.0f * v1 - flt_ic1;
         flt_ic2 = 2.0f * v2 - flt_ic2;
+        {                                    /* the swamp echo: the delay's length glides, like a tape, so no clicks */
+            float rd, fr, e, in;
+            uint32_t i0, i1;
+            dl_now += (dl_t - dl_now) * 0.0004f;
+            echo_wet += (wet_t - echo_wet) * 0.002f;
+            echo_fb += (fb_t - echo_fb) * 0.002f;
+            cave_g += (cave_t - cave_g) * 0.002f;
+            rd = (float)dl_w - dl_now;
+            if (rd < 0.0f)
+                rd += (float)DL_N;
+            i0 = (uint32_t)rd;
+            fr = rd - (float)i0;
+            if (i0 >= DL_N)
+                i0 = DL_N - 1u;
+            i1 = i0 + 1u >= DL_N ? 0u : i0 + 1u;
+            e = ((float)dl_buf[i0] + ((float)dl_buf[i1] - (float)dl_buf[i0]) * fr) * (1.0f / 16384.0f);
+            in = fm_clampf(v2 + e * echo_fb, -1.99f, 1.99f);
+            dl_buf[dl_w] = (int16_t)(in * 16384.0f);
+            if (++dl_w >= DL_N)
+                dl_w = 0;
+            v2 += e * echo_wet;
+            if (cave_g > 0.0005f || cave_t > 0.0f)   /* the cave, after the echo */
+                v2 += cave_tick(v2 * 0.3f) * cave_g;
+        }
         {                                    /* a high-pass under the speaker's range (lower with headphones) */
             float u3 = v2 - hp_ic2, u1 = h1 * hp_ic1 + h2 * u3, u2 = hp_ic2 + h2 * hp_ic1 + h3 * u3;
             hp_ic1 = 2.0f * u1 - hp_ic1;
@@ -287,6 +380,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     lim_pk = fm_flush(lim_pk);
     hp_ic1 = fm_flush(hp_ic1);
     hp_ic2 = fm_flush(hp_ic2);
+    for (j = 0; j < 4; j++)
+        rv_lp[j] = fm_flush(rv_lp[j]);
 }
 
 void app_panic(void)
