@@ -1,0 +1,44 @@
+# Croc-O-Synth's sound in the host simulator: one note in each tooth shape, then three crooked rows, then a chord.
+#   app/build/host/crocosynth_host app/tests/sound.txt app/build/host
+wait 3000
+tap EDIT
+wav round.wav
+key 7 down
+wait 600
+key 7 up
+wait 400
+wavstop
+turn K1 1
+wav pointy.wav
+key 7 down
+wait 600
+key 7 up
+wait 400
+wavstop
+turn K1 1
+wav block.wav
+key 7 down
+wait 600
+key 7 up
+wait 400
+wavstop
+turn K2 2
+turn K3 2
+wav rows.wav
+key 7 down
+wait 600
+key 7 up
+wait 400
+wavstop
+wav chord.wav
+key 7 down
+key 11 down
+key 14 down
+key 19 down
+wait 600
+key 7 up
+key 11 up
+key 14 up
+key 19 up
+wait 400
+wavstop

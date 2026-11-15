@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "crocosynth",
+  "name": "goose",
+  "author": "goose",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "tagline": "a crocodile teaches synth basics",
+  "description": "A kid-friendly firmware for the FM-1. A crocodile teaches synth basics, one lesson a button: teeth are the wave, rows of teeth are unison, the jaws are the filter.",
+  "tags": ["synth"],
+  "source": "https://github.com/Goosegoosegoosegoosegoose/croc-o-synth",
+  "hardware": {
+    "models": ["FM-1"],
+    "flash": ["856014", "B36014"],
+    "features": ["usb-audio-in", "usb-audio-out", "screen-reader"]
+  },
+  "credits": "Built on fm1-base by Charles Vestal and felucca-bsp by Leo Kuroshita (both MPL-2.0)."
+}

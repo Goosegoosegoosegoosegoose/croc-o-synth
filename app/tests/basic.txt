@@ -1,0 +1,73 @@
+# Croc-O-Synth in the host simulator: ./build.sh --host, then
+#   app/build/host/crocosynth_host app/tests/basic.txt app/build/host
+wait 300
+expect mode 0
+shot boot.png
+wait 2800
+expect mode 1
+expect page 0
+shot home.png
+# a key plays, and stops
+key 7 down
+wait 100
+expect voices 1
+key 7 up
+wait 50
+expect voices 0
+# the Teeth lesson: shape, rows, crooked
+tap EDIT
+wait 100
+expect page 1
+shot teeth-round.png
+turn K1 1
+expect teeth 1
+turn K2 2
+expect rows 3
+turn K3 1
+expect crook 3
+wait 100
+shot teeth-rows.png
+turn K1 5
+expect teeth 2
+# the jaws, on any page
+turn ALGO -6
+expect jaws 3
+wait 100
+shot jaws.png
+wait 2000
+# big croc
+tap OCT-
+tap OCT-
+expect size 2
+wait 100
+shot size.png
+wait 2000
+# a lesson to come
+tap SEQ
+wait 100
+expect page 2
+shot soon.png
+# the sound is kept across a power cycle
+tap HOME
+wait 3500
+expect store_writes 1
+reboot
+wait 3200
+expect teeth 2
+expect rows 3
+expect size 2
+expect jaws 3
+shot home-after.png
+# HOME held: goodbye, then asleep, then a press wakes it
+press HOME
+wait 1000
+expect mode 2
+release HOME
+wait 300
+shot bye.png
+wait 5000
+expect mode 3
+shot off.png
+tap PLAY
+wait 100
+expect mode 0

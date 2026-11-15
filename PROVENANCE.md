@@ -1,12 +1,14 @@
 # Provenance: what Croc-O-Synth took, copied and renamed
 
-Last updated: 2026-11-15 (fm1-base added as the planned foundation)
+Last updated: 2026-11-15 (first firmware on fm1-base)
 
 ## Short answer
 
-**No firmware code has been copied so far.** The only thing in this repository is the browser prototype (`index.html`), and every line of it was written new for this project. It contains no code from Felucca, from M-VAVE's stock firmware, or from any other FM-1 firmware.
+**No code from Felucca or from M-VAVE's stock firmware has been copied.** The browser prototype (`prototype/index.html`) was written new for this project.
 
-What we did take is **facts about the hardware** and **a few layout conventions**, by reading the open-source Felucca project. Those are listed below. When the real firmware starts, this file is where every copied file gets logged.
+The firmware (`app/`) is built on **fm1-base**, which is included whole as a git submodule (`base/`), and four small files in `app/` are adapted from fm1-base's template. Those are listed in the copy log at the end. The rest of the firmware (`app/app.c`, `app/synth.c`, `app/draw.c`) was written new, against the interface fm1-base defines.
+
+From Felucca we took only **facts about the hardware** and **a few layout conventions**, by reading it. Those are listed below.
 
 ## 1. Sources we read
 
@@ -17,7 +19,7 @@ What we did take is **facts about the hardware** and **a few layout conventions*
 | [Felucca-Engines](https://github.com/hugelton/Felucca-Engines) | Hügelton Instruments | MIT | commit `d026007` | Six synthesis engines and shared DSP helpers |
 | [fm1-base](https://github.com/charlesvestal/fm1-base) | Charles Vestal and contributors | MPL-2.0 | commit `c8e0599` (2026-11-13) | Platform layer on felucca-bsp (screen, drawing, fonts, panel, audio, MIDI, storage), a template app, a host simulator, a browser emulator, and build and install tools |
 
-They were cloned only to read them. Nothing from them is in this repository.
+Felucca and Felucca-Engines were cloned only to read them; nothing from them is in this repository. fm1-base (with felucca-bsp inside it) is in the repository as the submodule `base/`, at the commit above (felucca-bsp at `18eadad`).
 
 ## 2. Facts taken (hardware knowledge, not code)
 
@@ -86,9 +88,9 @@ These are standard synthesizer concepts, not anything taken from a particular fi
 
 Outside resources the prototype loads but does not copy: the Baloo 2 and Nunito fonts from Google Fonts (SIL Open Font Licence), by link.
 
-## 6. What we plan to take for the real firmware
+## 6. What the firmware takes, and what it may take later
 
-Nothing below has been done yet.
+The first two rows are done (see the copy log). The others have not been done.
 
 | Planned | From | Licence | What that obliges |
 | --- | --- | --- | --- |
@@ -108,4 +110,11 @@ Every file copied or adapted from another project gets a row here before it is c
 
 | Date | Our file | Copied or adapted from (project, path, commit) | Licence | What we changed or renamed |
 | --- | --- | --- | --- | --- |
-| | | Nothing yet | | |
+| 2026-11-15 | `base/` (submodule, unmodified) | fm1-base, whole repository, commit `c8e0599`; it includes felucca-bsp at `18eadad` | MPL-2.0 | Nothing changed |
+| 2026-11-15 | `app/app.h` | fm1-base `template/app.h`, commit `c8e0599` | MPL-2.0 | `APP_NAME` TEMPLATE to CROC-O-SYNTH; splash colour; the touch and Bluetooth options and the Bluetooth store object removed; the list of simulator checks |
+| 2026-11-15 | `app/platglue.c` | fm1-base `template/app.c`, commit `c8e0599`: the `midi_in` loop and the two note messages from its key scan | MPL-2.0 | The template's MIDI display and velocity removed; the two sends made into one helper, `key_midi`, USB only, fixed velocity |
+| 2026-11-15 | `app/fm1.toml` | fm1-base `template/fm1.toml`, commit `c8e0599` | MPL-2.0 | Every value replaced with Croc-O-Synth's; Bluetooth off; keys kept |
+| 2026-11-15 | `app/words.tsv` | fm1-base `template/words.tsv`, commit `c8e0599` | MPL-2.0 | The file format and header comment; the words are ours |
+| 2026-11-15 | `build.sh`, `tests/run_tests.sh`, `app/tests/*.txt` | Written new, in the layout fm1-base's template README describes; the test scripts use the simulator's commands | PolyForm Noncommercial | Not copied |
+
+Things in our own files that follow fm1-base's template without copying its lines: the function names the platform calls (`app_init`, `app_render`, `app_frame` and the others in `app.h`), the settings record with a magic number that is checked on load, and the `app_expect` hook for simulator tests. The platform's drawing calls (`cv_begin`, `cv_rect`, `cv_line`, `cv_text`, `cv_blit`) and fonts are used as an interface. `app/draw.c` sets the platform's canvas offset (`cv_oy`) directly to draw the screen in two bands.
