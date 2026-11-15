@@ -12,7 +12,7 @@ All dates are 2026-11-15.
 - **Changed:** the sizes went from five to three: small croc (F5 to G7), croc (F4 to G6), big croc (F3 to G5). Everything moved up one octave so no size goes below what the FM-1's speaker can play.
 - **Includes** everything in build 3.
 - **Checked:** simulator tests pass.
-- **On the FM-1:** not reported yet.
+- **On the FM-1:** installed. It worked and sounds great: the crackling and the strange low notes are gone.
 
 ## Build 3: deep bass kept off the speaker
 
@@ -25,7 +25,7 @@ All dates are 2026-11-15.
   - the limiter releases slowly, so it no longer reshapes each cycle of a low note
   - overall level set between builds 1 and 2
 - **Checked:** simulator tests pass; the row-change click stays fixed.
-- **On the FM-1:** not reported yet.
+- **On the FM-1:** not installed on its own; its changes were heard as part of build 4.
 
 ## Build 2: first sound fixes
 
