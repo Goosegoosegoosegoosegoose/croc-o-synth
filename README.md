@@ -46,4 +46,6 @@ Build on the open hardware layer and engines from the Felucca project:
 
 The FM-1 has a 240 x 240 colour screen, 7 encoders plus a volume pot, 14 buttons and 27 keys (F3 to G5). Art should be drawn for 240 x 240, with the croc in separate parts (body, upper jaw, lower jaw, tail, teeth, eyes, waving arm) so it can move.
 
+See [PROVENANCE.md](PROVENANCE.md) for what this project took, copied and renamed from other firmware. So far no code has been copied.
+
 Unofficial. Not affiliated with M-VAVE.
