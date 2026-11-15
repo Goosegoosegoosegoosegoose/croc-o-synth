@@ -7,7 +7,7 @@ name: Build firmware
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: ['**']        # every branch is built and tested; only main is published as the latest release
     paths: ['app/**', 'base', 'build.sh', 'tests/**', 'tools/**', 'docs/INSTALL.txt', '.github/workflows/build.yml']
 
 permissions:
