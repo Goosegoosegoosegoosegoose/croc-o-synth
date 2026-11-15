@@ -53,6 +53,8 @@ The simulator runs a script of presses and turns and writes screenshots and audi
 | `app/platglue.c`, `app/app.h`, `app/fm1.toml`, `app/words.tsv` | Adapted from fm1-base's template (MPL-2.0) |
 | `base/` | fm1-base, a git submodule (MPL-2.0) |
 
+Each firmware build and what changed in it is listed in [CHANGELOG.md](CHANGELOG.md).
+
 ## Not built yet
 
 - SCL (safe swamp: scales), ARP (croc hops), REC (croc remembers), SAVE
