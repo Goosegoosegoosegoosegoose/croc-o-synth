@@ -1,4 +1,4 @@
-# Croc Synth
+# Crocosynth
 
 A kid-friendly firmware idea for the M-VAVE FM-1 pocket synth: a crocodile teaches synth basics, one lesson per button.
 
