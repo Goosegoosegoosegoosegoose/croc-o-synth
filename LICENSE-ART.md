@@ -1,6 +1,6 @@
 # Licence for art, screens and names
 
-Copyright 2026 Goose
+Copyright 2026 goose
 
 The Croc-O-Synth character art, screen designs, lesson names and written text in this repository are licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International licence (CC BY-NC-SA 4.0).
 

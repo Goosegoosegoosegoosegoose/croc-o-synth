@@ -48,13 +48,13 @@ The FM-1 has a 240 x 240 colour screen, 7 encoders plus a volume pot, 14 buttons
 
 ## Licence
 
-Copyright 2026 Goose
+Copyright 2026 goose
 
 - **Code**: [PolyForm Noncommercial License 1.0.0](LICENSE.md). Free to use, change and share for non-commercial purposes. Selling it or using it commercially needs permission.
 - **Art, screens, names and text**: [CC BY-NC-SA 4.0](LICENSE-ART.md).
 - **Borrowed parts keep their own licences.** When the firmware is built, the hardware layer (felucca-bsp, MPL-2.0) and any engine from Felucca-Engines (MIT) stay under those licences; the notices above do not apply to them.
 
-Required Notice: Copyright 2026 Goose (https://github.com/Goosegoosegoosegoosegoose)
+Required Notice: Copyright 2026 goose (https://github.com/Goosegoosegoosegoosegoose)
 
 See [PROVENANCE.md](PROVENANCE.md) for what this project took, copied and renamed from other firmware. So far no code has been copied.
 
