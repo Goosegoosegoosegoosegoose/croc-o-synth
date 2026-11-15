@@ -1,6 +1,6 @@
 # Provenance: what Croc-O-Synth took, copied and renamed
 
-Last updated: 2026-11-15
+Last updated: 2026-11-15 (fm1-base added as the planned foundation)
 
 ## Short answer
 
@@ -15,6 +15,7 @@ What we did take is **facts about the hardware** and **a few layout conventions*
 | [Felucca](https://github.com/hugelton/Felucca) | Leo Kuroshita, Hügelton Instruments | GPL-3.0-only | commit `ca1db43` (2026-11-15) | Custom multi-engine firmware for the FM-1 |
 | [felucca-bsp](https://github.com/hugelton/felucca-bsp) | Leo Kuroshita and contributors | MPL-2.0 | commit `5942e68` | Hardware layer: chip drivers and FM-1 board code. No sound code, no user interface |
 | [Felucca-Engines](https://github.com/hugelton/Felucca-Engines) | Hügelton Instruments | MIT | commit `d026007` | Six synthesis engines and shared DSP helpers |
+| [fm1-base](https://github.com/charlesvestal/fm1-base) | Charles Vestal and contributors | MPL-2.0 | commit `c8e0599` (2026-11-13) | Platform layer on felucca-bsp (screen, drawing, fonts, panel, audio, MIDI, storage), a template app, a host simulator, a browser emulator, and build and install tools |
 
 They were cloned only to read them. Nothing from them is in this repository.
 
@@ -91,7 +92,8 @@ Nothing below has been done yet.
 
 | Planned | From | Licence | What that obliges |
 | --- | --- | --- | --- |
-| Hardware layer (clock, flash, USB, keys, LEDs, screen, audio) | felucca-bsp | MPL-2.0 | Keep those files under MPL-2.0 with their notices; publish any changes we make to those files |
+| Platform layer, build tools, simulator and installer, used as a git submodule; our app starts from its `template/` | fm1-base | MPL-2.0 | Its files stay MPL-2.0; publish any changes we make to those files. Its licensing notes say an app built on it may use any licence |
+| Hardware layer (clock, flash, USB, keys, LEDs, screen, audio), which fm1-base includes | felucca-bsp | MPL-2.0 | Keep those files under MPL-2.0 with their notices; publish any changes we make to those files |
 | A simple subtractive voice, probably the ANALOG engine and its DSP helpers | Felucca-Engines | MIT | Keep the copyright and licence notice |
 | Update loader and install tools | felucca-bsp | MPL-2.0 | As above |
 | A few binary files the package needs | JieLi AC79 SDK | Apache-2.0 | Ship the licence text with the package |
