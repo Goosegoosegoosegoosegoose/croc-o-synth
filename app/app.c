@@ -28,8 +28,9 @@ typedef struct {
     char name[NAME_LEN + 1];             /* the croc's name, A-Z and spaces; empty: not named yet */
     int8_t seq_note[SEQ_N];              /* the lily pads' notes (-1 empty) */
     uint8_t seq_pads, seq_gate, seq_tempo;
-    uint8_t scale, scale_home, scale_unsafe;   /* safe swamp (the scale mode): 0 every key or 1..NSCALE; the home note
-                                              * 0..11 (C..B); the keys outside it 0 play too, 1 slide, 2 stay quiet */
+    uint8_t scale, scale_home, scale_unsafe;   /* safe swamp (the scale mode): 0 no scale or 1..NSCALE; the home note
+                                              * 0..11 (C..B). The scale only lights its keys: every key still plays.
+                                              * scale_unsafe is not used (kept 0, so the record keeps its shape) */
     uint8_t arp;                         /* croc hops (the arpeggiator): 0 off */
     uint8_t rsv[15];                     /* room for more: take from here, so the record keeps its size */
 } settings_t;
@@ -167,8 +168,9 @@ void app_init(void)
         set.seq_tempo = 3;
         set.scale = set.scale_home = set.scale_unsafe = set.arp = 0;
     }
-    if (set.scale > NSCALE || set.scale_home > 11 || set.scale_unsafe > 2)   /* only the scale is put back, not her sound */
-        set.scale = set.scale_home = set.scale_unsafe = 0;
+    if (set.scale > NSCALE || set.scale_home > 11)   /* only the scale is put back, not her sound */
+        set.scale = set.scale_home = 0;
+    set.scale_unsafe = 0;
     set.magic = SET_MAGIC;
     if (old)
         dirty_at = 1u;                       /* saved again in the new form */
@@ -203,24 +205,9 @@ static int swamp_has(int32_t note)
 {
     return !set.scale || (SWAMP_SCALE[set.scale - 1] >> ((note - (int32_t)set.scale_home + 120) % 12) & 1u);
 }
-/* The note a key plays: key 0 is F3 (MIDI 53). -1: the key stays silent. With a scale set, a key outside it plays as
- * it is, slides to the nearest key in the scale (the lower one when two are as near; never off the keyboard), or
- * stays quiet. */
-static int32_t key_to_note(uint32_t k)
-{
-    int32_t n = 53 + (int32_t)k, d;
-    if (!set.scale_unsafe || swamp_has(n))
-        return n;
-    if (set.scale_unsafe == 2)
-        return -1;
-    for (d = 1; d < 12; d++) {
-        if (n - d >= 53 && swamp_has(n - d))
-            return n - d;
-        if (n + d < 53 + NKEYS && swamp_has(n + d))
-            return n + d;
-    }
-    return n;
-}
+/* The note a key plays: key 0 is F3 (MIDI 53). -1: the key stays silent. The scale does not change this: it only
+ * lights its keys, and every key plays its own note. */
+static int32_t key_to_note(uint32_t k) { return 53 + (int32_t)k; }
 /* The lights. Buttons: lit, the rest glowing (PLAY green), SCL half lit while a scale is set. Keys: lit, the scale's
  * home notes half lit, its other notes glowing. The scale's lights stay on whatever page is up. */
 static void swamp_lights(uint32_t buttons, uint32_t keys)
@@ -503,9 +490,9 @@ static void input(void)
                     seq_changed();
                 }
             } else if (ui.page == PG_SCALE) {    /* the scale is the instrument's, not the sound's: no My Croc */
-                uint8_t *v = k == 0 ? &set.scale : k == 1 ? &set.scale_home : &set.scale_unsafe;
-                int32_t n = clamp((int32_t)*v + d, 0, k == 0 ? NSCALE : k == 1 ? 11 : 2);
-                if (k == 3) {
+                uint8_t *v = k == 0 ? &set.scale : &set.scale_home;
+                int32_t n = clamp((int32_t)*v + d, 0, k == 0 ? NSCALE : 11);
+                if (k >= 2) {
                     used = 0;
                 } else if (n != *v) {
                     *v = (uint8_t)n;
@@ -678,8 +665,7 @@ static void picture_seq(float t)
  * show it (the home notes yellow) */
 static void picture_scale(float t)
 {
-    static const char *const KN[4] = {"SCALE", "HOME", "OTHERS", 0};
-    static const char *const OTHER[3] = {"THEY PLAY TOO", "THEY SLIDE TO A LIT KEY", "THEY STAY QUIET"};
+    static const char *const KN[4] = {"SCALE", "HOME", 0, 0};
     static const uint8_t BLACK[12] = {0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0};
     char buf[24];
     const char *what, *now;
@@ -691,9 +677,6 @@ static void picture_scale(float t)
         what = "THE HOME NOTE: WHERE THE SCALE STARTS";
         text_join(buf, "HOME IS ", NOTE_NAME[set.scale_home], "");
         now = buf;
-    } else if (ui.focus == F_K3) {
-        what = "THE KEYS THAT ARE NOT LIT";
-        now = set.scale ? OTHER[set.scale_unsafe] : "PICK A SCALE FIRST";
     } else {
         what = set.scale ? "THE LIT KEYS ARE IN THIS SCALE" : "A SCALE LIGHTS UP ITS KEYS";
         now = SWAMP_FEEL[set.scale];
@@ -1159,8 +1142,6 @@ int app_expect(const char *what, int *got)
         *got = set.scale;
     else if (!strcmp(what, "scalehome"))
         *got = set.scale_home;
-    else if (!strcmp(what, "scaleother"))
-        *got = set.scale_unsafe;
     else if (!strcmp(what, "litscale"))          /* the keys glowing for the scale, as bits (key 0 is bit 0) */
         *got = (int)ui.lit_scale;
     else if (!strcmp(what, "lithome"))

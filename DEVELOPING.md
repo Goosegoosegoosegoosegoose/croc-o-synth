@@ -90,6 +90,6 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 
 ### Notes for the two lessons
 
-**Safe swamp (SCL).** Built in build 9. `SWAMP_SCALE` in `app.c` is the table of scales (add one there, with its name and its word in `SWAMP_NAME` and `SWAMP_FEEL`, and raise `NSCALE`); `key_to_note()` is the one place a key becomes a note; `swamp_lights()` sets every light, on every page: the scale's keys glow, its home notes are half lit, held keys and the note a pad is playing are fully lit. An arpeggiator that lights keys should pass them to `swamp_lights()` as lit keys, so the scale stays underneath.
+**Safe swamp (SCL).** Built in build 9. `SWAMP_SCALE` in `app.c` is the table of scales (add one there, with its name and its word in `SWAMP_NAME` and `SWAMP_FEEL`, and raise `NSCALE`); `key_to_note()` is the one place a key becomes a note (the scale does not change it: it only lights keys, by the owner's choice); `swamp_lights()` sets every light, on every page: the scale's keys glow, its home notes are half lit, held keys and the note a pad is playing are fully lit. An arpeggiator that lights keys should pass them to `swamp_lights()` as lit keys, so the scale stays underneath.
 
 **Croc hops (ARP).** Hold a few keys and the croc plays them one at a time: up, down, or random. It needs a clock: use the sequencer's (`seq_tick` in `synth.c`, with the hop speed on the SELECT knob); do not add a second one. The saved record has an `arp` byte waiting (0 must mean off).

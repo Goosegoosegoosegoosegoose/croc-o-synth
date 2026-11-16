@@ -53,7 +53,7 @@ These are places where our design does the same job with the same control as Fel
 | OCT- / OCT+ | Octave down and up | Big croc and small croc (octave, three steps) | Same job, renamed |
 | HOME | Home screen; hold for menu | Home croc; hold for goodbye | Press same, hold different |
 | GLO | Mixer, global, system; hold for mutes | Grown-ups; hold to name the croc | Similar press, hold different |
-| SCL | Scale | Safe swamp: a scale and its home note; the scale's keys stay lit on every page | Same area, our own design and code |
+| SCL | Scale | Safe swamp: a scale and its home note; the scale's keys stay lit on every page, and every key still plays | Same area, our own design and code |
 | ARP, REC, SAVE | Arpeggiator, record, save | Planned: Croc hops, Croc remembers, Save | Planned, same areas |
 
 ## 4. Renamed synth terms (our names for standard ideas)

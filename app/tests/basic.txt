@@ -211,31 +211,15 @@ expect litscale 93542709
 expect lithome 2097664
 wait 100
 shot scale-dharm.png
-# a key outside the scale (F#): as it is, then it slides to F, then it stays quiet
+# the scale only lights keys: a key outside it (F#) still plays its own note, and knob 3 does nothing
 expect keynote01 54
-turn K3 1
-expect scaleother 1
-expect keynote01 53
-expect keynote00 53
+turn K3 2
+expect keynote01 54
 key 1 down
 wait 60
 expect voices 1
 key 1 up
 wait 100
-shot scale-others.png
-turn K3 1
-expect scaleother 2
-expect keynote01 -1
-key 1 down
-wait 60
-expect voices 0
-key 1 up
-key 0 down
-wait 60
-expect voices 1
-key 0 up
-turn K3 -1
-expect scaleother 1
 # the last scale, and the knob stops there
 turn K1 9
 expect scale 10
@@ -283,7 +267,6 @@ expect hop 3
 expect tempo 6
 expect scale 3
 expect scalehome 2
-expect scaleother 1
 expect litscale 93542709
 expect playing 0
 shot home-after.png

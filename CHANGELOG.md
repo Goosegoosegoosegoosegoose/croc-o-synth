@@ -8,14 +8,14 @@ Builds 1 to 8 are dated 2026-11-15; build 9 is 2026-11-16.
 
 ## Build 9: safe swamp (scales)
 
-- Commit: the one that adds this entry, on the branch `scale-mode` until it is merged into `main`.
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
 - **Added, on SCL:**
   - knob 1 **SCALE**: every key (no scale), major, minor, harmonic minor, melodic minor, harmonic major, Dorian, Phrygian, Lydian, Mixolydian, Locrian. Major is the Ionian mode and minor the Aeolian, so all seven modes are there. The screen shows the scale's name, a word for how it feels, and a keyboard with a dot on every key in the scale
   - knob 2 **HOME**: the home note (the root), C to B
-  - knob 3 **OTHERS**: what the keys outside the scale do: play too (the start setting), slide to the nearest lit key, or stay quiet
+  - every key still plays its own note: the scale only shows which keys are in it
   - **the key lights show the scale**: its keys glow, its home notes are a step brighter, and a held key or the note a lily pad is playing is fully lit. The lights stay on every page, so the scale shows on the lily pads and while the croc hops. SCL is half lit on other pages while a scale is set
-  - the scale, its home note and the OTHERS setting are saved. They belong to the instrument, not to the sound: changing them does not switch to My Croc, and the PRESETS knob does not change them
-- **Checked:** simulator checks pass: the lit keys for C major and D harmonic minor match the scales note for note, they stay lit on the lily pad and teeth pages and while the croc hops, a key outside the scale plays, slides or stays quiet as set, all of it is kept across a power cycle, and no key stays lit once the croc is asleep.
+  - the scale and its home note are saved. They belong to the instrument, not to the sound: changing them does not switch to My Croc, and the PRESETS knob does not change them
+- **Checked:** simulator checks pass: the lit keys for C major and D harmonic minor match the scales note for note, they stay lit on the lily pad and teeth pages and while the croc hops, a key outside the scale still plays its own note, all of it is kept across a power cycle, and no key stays lit once the croc is asleep.
 - **Not checked:** how the three brightness levels look on the real keys. The simulator only knows lit and glowing.
 - **On the FM-1:** not reported yet.
 
