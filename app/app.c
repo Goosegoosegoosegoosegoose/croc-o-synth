@@ -15,7 +15,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 11"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 12"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -33,7 +33,9 @@ typedef struct {
                                               * scale_unsafe is not used (kept 0, so the record keeps its shape) */
     uint8_t arp;                         /* croc hops (the arpeggiator): 0 off, 1 up, 2 down, 3 up and down, 4 any way */
     uint8_t arp_keep;                    /* 1: keep hopping when the keys are let go */
-    uint8_t rsv[14];                     /* room for more: take from here, so the record keeps its size */
+    uint8_t star_lo, star_hi;            /* the stars won, a bit a challenge (SAVE) */
+    uint8_t chal;                        /* the challenge she has picked */
+    uint8_t rsv[11];                     /* room for more: take from here, so the record keeps its size */
 } settings_t;
 /* older records, read once and carried over, so an update keeps the croc's name and her sound */
 #define SET_MAGIC_V3 0x43524F33u         /* "CRO3": build 7 */
@@ -117,6 +119,49 @@ static void seq_from_settings(void)          /* the saved pads and speed into th
     crochop.keep = set.arp_keep;
 }
 
+/* ------------------------------------------------------------ challenges --- */
+/* SAVE: a list of small things to do, one for each lesson, and a star for each one done. She picks one; it is
+ * checked wherever she is, and the star is won when it goes from not done to done (so a challenge that is already
+ * done when she picks it has to be undone first). */
+#define NCHAL 12
+typedef struct {
+    const char *l1, *l2;                 /* the challenge, two short lines */
+    const char *hint;                    /* where to start */
+    uint8_t btn;                         /* that lesson's button, to blink (NB: none) */
+} chal_t;
+static const chal_t CHAL[NCHAL] = {
+    {"MAKE THE CROC", "YAWN", "PRESS ENV. OPEN AND CLOSE SLOWLY", B_ENV},
+    {"GIVE THE CROC", "POINTY TEETH", "PRESS EDIT. TURN KNOB 1", B_EDIT},
+    {"THREE ROWS OF", "CROOKED TEETH", "PRESS EDIT. TURN KNOBS 2 AND 3", B_EDIT},
+    {"SHUT THE JAWS", "TIGHT", "TURN THE ALGORITHM KNOB", NB},
+    {"MAKE A BIG CROC", "SING LOW", "PRESS OCT-", B_OCTDN},
+    {"TICKLE", "THE BELLY", "PRESS LFO. SPEED UP, THEN TICKLE", B_LFO},
+    {"A HUGE,", "SUPER FAST WAG", "PRESS LFO. TURN KNOBS 1 AND 2 UP", B_LFO},
+    {"LOTS OF ECHOES", "IN A GIANT CAVE", "PRESS FX. TURN KNOBS 1 AND 3 UP", B_FX},
+    {"HOP ON JUST", "FOUR LILY PADS", "PRESS SEQ. KNOB 2, THEN PLAY", B_SEQ},
+    {"HOP UP AND DOWN", "ON THREE KEYS", "PRESS ARP. KNOB 1, HOLD 3 KEYS", B_ARP},
+    {"TEACH THE CROC", "A TUNE", "PRESS REC. PLAY 4 NOTES. REC AGAIN", B_REC},
+    {"LIGHT UP", "A SCALE", "PRESS SCL. TURN KNOB 1", B_SEL},
+};
+static int chal_done(int i)                  /* is challenge i done, as things are now? */
+{
+    switch (i) {
+    case 0: return snd.atk >= 7 && snd.rel >= 7;
+    case 1: return snd.teeth == 1;
+    case 2: return snd.rows == 3 && snd.crook >= 3;
+    case 3: return snd.jaws <= 1;
+    case 4: return snd.size == 1;
+    case 5: return snd.wag > 0 && snd.wag_to == 1;
+    case 6: return snd.wag >= 6 && snd.wag_size == 4;
+    case 7: return snd.echo >= 5 && snd.cave >= 5;
+    case 8: return set.seq_pads == 4 && seq.playing;
+    case 9: return set.arp == 3 && crochop_n >= 3;
+    case 10: return crocmem_state == CM_SING && crocmem_n >= 8;
+    default: return set.scale != 0;
+    }
+}
+static uint32_t stars_won(void) { return (uint32_t)set.star_lo | (uint32_t)set.star_hi << 8; }
+
 static void crocmem_ask(int what)             /* croc remembers: listen, sing, be quiet (synth.c does it) */
 {
     crocmem.cmd = (uint8_t)what;
@@ -182,6 +227,8 @@ void app_init(void)
     set.scale_unsafe = 0;
     if (set.arp > 4 || set.arp_keep > 1)     /* croc hops alone: back to off */
         set.arp = set.arp_keep = 0;
+    if (set.chal >= NCHAL)
+        set.chal = 0;
     set.magic = SET_MAGIC;
     if (old)
         dirty_at = 1u;                       /* saved again in the new form */
@@ -193,7 +240,7 @@ void app_init(void)
 
 /* --------------------------------------------------------------------- UI --- */
 enum { M_BOOT, M_PLAY, M_BYE, M_OFF, M_NAME };
-enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ, PG_SCALE, PG_ARP, PG_REC };
+enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ, PG_SCALE, PG_ARP, PG_REC, PG_STAR };
 enum { OV_NONE, OV_SIZE, OV_JAWS, OV_TEMPO };
 enum { F_NONE = -1, F_K1, F_K2, F_K3, F_K4 };   /* which of KNOB 1 to 4 was turned last on this page */
 
@@ -201,7 +248,10 @@ static struct {
     uint8_t mode, page, ov, soon;        /* soon: the button whose lesson is still to come */
     int8_t focus;
     uint32_t t0;                         /* when this mode began */
-    uint32_t ov_until, home_t, glo_t, last_draw, last_touch;
+    uint32_t ov_until, home_t, glo_t, save_t, last_draw, last_touch;
+    uint32_t star_until;                 /* a star was just won: the cheer is on the screen until then */
+    uint8_t star_won;                    /* which challenge that was */
+    uint8_t chal_armed;                  /* the picked challenge has been seen not done: doing it now wins the star */
     uint32_t keys, btn;
     uint8_t key_note[NKEYS];             /* the note each held key started (its note-off must match) */
     uint8_t letter[NAME_LEN];            /* the name being spelled: 0 a space, 1..26 A..Z */
@@ -271,7 +321,8 @@ static void set_mode(int m)
     ui.mode = (uint8_t)m;
     ui.t0 = plat_ms();
     ui.ov = OV_NONE;
-    ui.home_t = ui.glo_t = 0;
+    ui.home_t = ui.glo_t = ui.save_t = 0;
+    ui.star_until = 0;
     if (m != M_PLAY) {
         seq.playing = 0;                     /* the croc stops hopping, and lets go of the keys it kept */
         crochop.flush++;
@@ -449,6 +500,9 @@ static void input(void)
         } else if (k == B_GLO) {
             go_page(PG_GLO);
             ui.glo_t = now | 1u;
+        } else if (k == B_SAVE) {            /* the challenges and their stars */
+            go_page(PG_STAR);
+            ui.save_t = now | 1u;
         } else {
             go_page(PG_SOON);
             ui.soon = (uint8_t)k;
@@ -459,6 +513,17 @@ static void input(void)
             ui.home_t = 0;
         } else if (now - ui.home_t >= 900u) {
             set_mode(M_BYE);
+        }
+    }
+    if (ui.save_t) {                         /* SAVE held two seconds: the stars are given back (for a grown-up) */
+        if (!(btn >> B_SAVE & 1u)) {
+            ui.save_t = 0;
+        } else if (now - ui.save_t >= 2000u) {
+            ui.save_t = 0;
+            set.star_lo = set.star_hi = 0;
+            set.chal = 0;
+            ui.chal_armed = 0;
+            touched();
         }
     }
     if (ui.glo_t) {                          /* GLO held: name the croc */
@@ -506,6 +571,15 @@ static void input(void)
                     step(&snd.wag, d, 0, 8);
                 } else {
                     step(&snd.echo, d, 0, 6);
+                }
+            } else if (ui.page == PG_STAR) { /* pick a challenge */
+                int32_t nc = clamp((int32_t)set.chal + d, 0, NCHAL - 1);
+                if (k != 0) {
+                    used = 0;
+                } else if (nc != set.chal) {
+                    set.chal = (uint8_t)nc;
+                    ui.chal_armed = 0;
+                    touched();
                 }
             } else if (ui.page == PG_REC) {  /* how it is sung back: not saved */
                 if (k == 0)
@@ -593,10 +667,12 @@ static void input(void)
         uint32_t page_btn = ui.page == PG_HOME ? B_HOME : ui.page == PG_EDIT ? B_EDIT : ui.page == PG_ENV ? B_ENV
                             : ui.page == PG_LFO ? B_LFO : ui.page == PG_GLO ? B_GLO : ui.page == PG_FX ? B_FX
                             : ui.page == PG_SEQ ? B_SEQ : ui.page == PG_SCALE ? B_SEL : ui.page == PG_ARP ? B_ARP
-                            : ui.page == PG_REC ? B_REC : ui.soon;
+                            : ui.page == PG_REC ? B_REC : ui.page == PG_STAR ? B_SAVE : ui.soon;
         uint8_t ms = crocmem_state;
+        uint32_t hint = ui.page == PG_STAR && !(stars_won() >> set.chal & 1u) && CHAL[set.chal].btn < NB && (now / 300u & 1u)
+                            ? 1u << CHAL[set.chal].btn : 0u;      /* where this challenge starts: that button blinks */
         ui.play_red = ms == CM_WAIT || ms == CM_LISTEN;      /* PLAY goes red while the croc listens */
-        swamp_lights(1u << page_btn | (seq.playing || ms != CM_QUIET ? 1u << B_PLAY : 0u),
+        swamp_lights(1u << page_btn | hint | (seq.playing || ms != CM_QUIET ? 1u << B_PLAY : 0u),
                      keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u) | (hn >= 53 && hn < 53 + NKEYS ? 1u << (hn - 53) : 0u) |
                          (crocmem_keys & ((1u << NKEYS) - 1u)));
     }
@@ -763,6 +839,67 @@ static void picture_scale(float t)
                     s_ellipse((float)x, 189.0f, 2.8f, 2.8f, home ? K_SUN : K_GLOW);
             }
         }
+    }
+    strip(KN, ui.focus);
+}
+
+/* a star was just won: the cheer, over whatever page she is on */
+static void picture_cheer(float t)
+{
+    char buf[48];
+    croc_t c;
+    scene(168);
+    t_center(120, 4, "YOU DID IT!", K_INK, 228, 2);
+    text_join(buf, CHAL[ui.star_won].l1, " ", CHAL[ui.star_won].l2);
+    cv_text(120 - text_w(&FONT_XS, buf) / 2, 38, &FONT_XS, buf, K_CROCD);
+    m_reset();
+    s_star(120.0f, 104.0f, 46.0f + 4.0f * fm_sinf(t * 8.0f), RGB(232, 168, 40));
+    s_star(120.0f, 104.0f, 40.0f + 4.0f * fm_sinf(t * 8.0f), K_SUN);
+    croc_look(&c);
+    c.jaw = 0.6f + 0.2f * fm_sinf(t * 10.0f);
+    c.tail = fm_sinf(t * 9.0f) * 0.4f;
+    croc_draw(130.0f, 196.0f, 0.55f, &c);
+}
+
+/* the challenges: the one she picked, where to start it, and the stars won so far */
+static void picture_star(float t)
+{
+    static const char *const KN[4] = {"PICK", 0, 0, 0};
+    char buf[24];
+    croc_t c;
+    uint32_t won = stars_won(), i, got = won >> set.chal & 1u, count = 0;
+    const char *hint;
+    for (i = 0; i < NCHAL; i++)
+        count += won >> i & 1u;
+    scene(150);
+    if (count == NCHAL)
+        t_center(120, 2, "EVERY STAR!", K_CROCD, 228, 1);
+    else {
+        num_text(buf, (int32_t)set.chal + 1, "CHALLENGE ", "");
+        t_center(120, 2, buf, K_INK, 228, 1);
+    }
+    t_center(120, 30, CHAL[set.chal].l1, K_INK, 228, 1);
+    t_center(120, 56, CHAL[set.chal].l2, K_INK, 228, 1);
+    croc_look(&c);
+    c.jaw = got ? 0.5f : 0.15f;
+    c.tail = got ? fm_sinf(t * 6.0f) * 0.3f : 0.0f;
+    croc_mid(146.0f, 0.62f, &c);
+    m_reset();
+    if (got) {                               /* its star, over the croc */
+        s_star(52.0f, 112.0f, 20.0f, RGB(232, 168, 40));
+        s_star(52.0f, 112.0f, 16.0f, K_SUN);
+    }
+    label_box();
+    hint = got ? "YOU HAVE THIS STAR!" : chal_done(set.chal) && !ui.chal_armed ? "UNDO IT, THEN DO IT AGAIN" : CHAL[set.chal].hint;
+    {
+        const felucca_font_t *f = text_w(&FONT_XS, hint) <= 208 ? &FONT_XS : &FONT_T;
+        cv_text(120 - text_w(f, hint) / 2, 174, f, hint, got ? K_SUN : K_CREAM);
+    }
+    for (i = 0; i < NCHAL; i++) {            /* the stars: won ones bright, this one ringed */
+        float x = 26.0f + (float)i * 17.0f;
+        if (i == set.chal)
+            s_ellipse(x, 202.0f, 9.5f, 9.5f, K_MOUTH);
+        s_star(x, 202.5f, 7.0f, won >> i & 1u ? K_SUN : RGB(52, 96, 84));
     }
     strip(KN, ui.focus);
 }
@@ -935,6 +1072,10 @@ static void picture(float t)
     static const float SIZE_S[3] = {0.55f, 0.8f, 1.05f};
     char buf[32];
     croc_t c;
+    if (ui.star_until && ui.mode == M_PLAY) {
+        picture_cheer(t);
+        return;
+    }
     m_reset();
     croc_look(&c);
     if (ui.mode == M_BOOT) {
@@ -1181,6 +1322,10 @@ static void picture(float t)
         picture_mem(t);
         return;
     }
+    if (ui.page == PG_STAR) {
+        picture_star(t);
+        return;
+    }
     if (ui.page == PG_FX) {
         static const char *const KN[4] = {"ECHO", "FAR", "CAVE", 0};
         static const char *const FAR[5] = {"VERY NEAR", "NEAR", "MIDDLE", "FAR", "VERY FAR"};
@@ -1235,8 +1380,9 @@ static void picture(float t)
         c.jaw = 0.1f;
         croc_mid(140.0f, 0.85f, &c);
         label_box();
-        t_small(120, 176, "HOLD GLO: NAME THE CROC", K_CREAM);
-        t_small(120, 193, "HOLD HOME: BYE BYE", K_CREAM);
+        t_small(120, 173, "HOLD GLO: NAME THE CROC", K_CREAM);
+        t_small(120, 186, "HOLD HOME: BYE BYE", K_CREAM);
+        t_small(120, 199, "HOLD SAVE: GIVE THE STARS BACK", K_CREAM);
         return;
     }
     scene(150);                              /* a lesson still to come */
@@ -1286,6 +1432,20 @@ void app_frame(void)
         set_mode(M_BYE);
     if (ui.ov && now >= ui.ov_until)
         ui.ov = OV_NONE;
+    if (ui.star_until && now >= ui.star_until)
+        ui.star_until = 0;
+    if (ui.mode == M_PLAY && !(stars_won() >> set.chal & 1u)) {   /* the picked challenge, wherever she is */
+        if (!chal_done(set.chal)) {
+            ui.chal_armed = 1;
+        } else if (ui.chal_armed) {          /* not done, and now done: a star */
+            ui.chal_armed = 0;
+            set.star_lo |= (uint8_t)(1u << set.chal);
+            set.star_hi |= (uint8_t)((1u << set.chal) >> 8);
+            ui.star_won = set.chal;
+            ui.star_until = now + 3000u;
+            touched();
+        }
+    }
     /* kept, a moment after a change: in a quiet moment if there is one, and anyway after a quarter of a minute (the
      * lily pads or a kept handful of hops can play for as long as she likes) */
     if (dirty_at && now - dirty_at > 3000u && (!voices_sounding() || now - dirty_at > 15000u)) {
@@ -1354,6 +1514,12 @@ int app_expect(const char *what, int *got)
         *got = crochop_n;
     else if (!strcmp(what, "arpat"))
         *got = crochop_at;
+    else if (!strcmp(what, "chal"))
+        *got = set.chal;
+    else if (!strcmp(what, "stars"))             /* the stars won, as bits (challenge 1 is bit 0) */
+        *got = (int)stars_won();
+    else if (!strcmp(what, "cheer"))
+        *got = ui.star_until != 0;
     else if (!strcmp(what, "memstate"))          /* 0 quiet, 1 waiting for a key, 2 listening, 3 singing */
         *got = crocmem_state;
     else if (!strcmp(what, "memn"))

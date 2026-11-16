@@ -4,7 +4,24 @@ Every firmware build, newest first: what changed, what was checked, and what hap
 
 All of these are development builds, so the FM-1 reports the same identity for each (`FM-1_5800`). The commit is what tells them apart.
 
-Builds 1 to 8 are dated 2026-11-15; builds 9 to 11 are 2026-11-16.
+Builds 1 to 8 are dated 2026-11-15; builds 9 to 12 are 2026-11-16.
+
+## Build 12: challenges and stars
+
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
+- **Added, on SAVE:** twelve challenges, one or two for each lesson, and a star for each one done.
+  - knob 1 **PICK** chooses a challenge. The screen shows it in two lines, where to start, and the row of stars
+  - the button of the lesson to go to blinks
+  - the picked challenge is checked on every page. The star is won when it goes from not done to done, with a "YOU DID IT!" screen for three seconds
+  - a challenge that is already done when it is picked says "UNDO IT, THEN DO IT AGAIN"
+  - a star stays once won. All twelve: the title reads "EVERY STAR!"
+  - hold **SAVE** for two seconds to give all the stars back (listed on the GLO page)
+- **The challenges:** make the croc yawn (open 7+, close 7+); pointy teeth; three rows of crooked teeth (crook 3+); shut the jaws tight (1 or less); a big croc; tickle the belly (speed above 0); a huge, super fast wag (speed 6+, size 4); lots of echoes in a giant cave (both 5+); four lily pads, hopping; up and down on three keys; teach the croc a tune (4 notes, sung back); light up a scale.
+- **Saved:** the stars and the picked challenge, in three of the spare bytes, so the record keeps its size and nothing else is lost in the update.
+- **Checked:** simulator checks pass, with a new script: five stars won in different ways, no star for something already done, stars kept through a power cycle, stars given back by holding SAVE. Screens looked at.
+- **Not checked:** challenges 3, 4, 6, 7, 8, 10 and 12 were not each played through in the script (their conditions are one line each). The blinking lesson button, on the device.
+- **Not done:** the browser prototype has no challenges.
+- **On the FM-1:** not installed yet.
 
 ## Build 11: croc remembers
 

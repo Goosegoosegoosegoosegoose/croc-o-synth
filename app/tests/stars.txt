@@ -1,0 +1,119 @@
+# The challenges and their stars (SAVE) in the host simulator:
+#   app/build/host/crocosynth_host app/tests/stars.txt app/build/host
+# page 11 is the challenges. stars: the stars won as bits (challenge 1 is 1, challenge 2 is 2, challenge 3 is 4 ...)
+wait 3000
+tap HOME
+wait 100
+tap SAVE
+expect page 11
+expect chal 0
+expect stars 0
+wait 100
+shot star-first.png
+# challenge 1, make the croc yawn: on the envelope page, open and close slowly
+tap ENV
+turn K1 9
+expect stars 0
+turn K4 9
+wait 50
+expect stars 1
+expect cheer 1
+wait 300
+shot star-cheer.png
+wait 3000
+expect cheer 0
+tap SAVE
+wait 100
+shot star-won.png
+# challenge 2, pointy teeth
+turn K1 1
+expect chal 1
+wait 100
+shot star-two.png
+tap EDIT
+turn K1 1
+wait 50
+expect stars 3
+wait 3200
+# a challenge that is already done when she picks it gives no star until it is undone and done again
+tap OCT-
+tap OCT-
+expect size 1
+tap SAVE
+turn K1 3
+expect chal 4
+wait 100
+expect stars 3
+shot star-undo.png
+tap OCT+
+wait 50
+expect stars 3
+tap OCT-
+wait 50
+expect stars 19
+wait 3200
+# a star once won stays, even when the thing is undone
+tap ENV
+turn K1 -9
+turn K4 -9
+wait 50
+expect stars 19
+# the lily pads: four pads, and hopping
+tap SAVE
+turn K1 4
+expect chal 8
+tap SEQ
+turn K2 -4
+expect pads 4
+wait 50
+expect stars 19
+tap PLAY
+wait 60
+expect stars 275
+tap PLAY
+wait 3200
+# croc remembers: four notes, sung back
+tap SAVE
+turn K1 2
+expect chal 10
+tap REC
+key 7 down
+wait 80
+key 7 up
+wait 80
+key 9 down
+wait 80
+key 9 up
+wait 80
+key 11 down
+wait 80
+key 11 up
+wait 80
+key 12 down
+wait 80
+key 12 up
+wait 80
+expect stars 275
+tap REC
+wait 60
+expect stars 1299
+tap REC
+wait 3200
+# kept across a power cycle, with the challenge she was on
+wait 3200
+expect store_writes >0
+reboot
+wait 3200
+expect stars 1299
+expect chal 10
+tap SAVE
+wait 100
+shot star-many.png
+# SAVE held for two seconds gives the stars back
+press SAVE
+wait 1000
+expect stars 1299
+wait 1200
+release SAVE
+expect stars 0
+expect chal 0

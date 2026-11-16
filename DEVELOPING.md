@@ -86,7 +86,7 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 | Safe swamp, the scale mode (SCL) | `main` | Done: build 9 (not seen on a real FM-1 yet) |
 | Croc hops, the arpeggiator (ARP) | `main` | Done: build 10 (not seen on a real FM-1 yet) |
 | Croc remembers (REC) | `main` | Done: build 11 (not seen on a real FM-1 yet) |
-| SAVE, challenges and stars | not started | |
+| SAVE, challenges and stars | done (build 12) | list `CHAL[]` and checks `chal_done()` in `app/app.c`; a new challenge needs a row in each, and stars are 16 bits |
 | The croc and background art | the owner | In progress |
 
 ### Notes for the two lessons

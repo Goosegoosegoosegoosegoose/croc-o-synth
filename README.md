@@ -60,8 +60,7 @@ Each firmware build and what changed in it is listed in [CHANGELOG.md](CHANGELOG
 
 ## Not built yet
 
-- SAVE (everything saves itself, so this button has no job yet)
-- Challenges and stars for each lesson
+- Saving the recorded tune (it lasts until the power goes off)
 - Final croc and background art (the current drawing is a placeholder)
 
 ## What the firmware is built on

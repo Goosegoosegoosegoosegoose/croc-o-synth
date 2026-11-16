@@ -301,6 +301,22 @@ static void croc_draw(float cx, float cy, float s, const croc_t *o)
 }
 static void croc_mid(float y, float s, const croc_t *o) { croc_draw(120.0f + 19.0f * s, y, s, o); }
 
+/* a five-pointed star, r to its points: a pentagon and five triangles (each a convex piece) */
+static void s_star(float cx, float cy, float r, uint16_t col)
+{
+    static const float SC[10] = {0.0f, 0.5878f, 0.9511f, 0.9511f, 0.5878f, 0.0f, -0.5878f, -0.9511f, -0.9511f, -0.5878f};
+    static const float SS[10] = {-1.0f, -0.809f, -0.309f, 0.309f, 0.809f, 1.0f, 0.809f, 0.309f, -0.309f, -0.809f};
+    float q = r * 0.42f;
+    int i;
+    p_begin();
+    for (i = 1; i < 10; i += 2)
+        p_add(cx + q * SC[i], cy + q * SS[i]);
+    p_fill(col);
+    for (i = 0; i < 10; i += 2)
+        s_tri(cx + r * SC[i], cy + r * SS[i], cx + q * SC[(i + 1) % 10], cy + q * SS[(i + 1) % 10], cx + q * SC[(i + 9) % 10],
+              cy + q * SS[(i + 9) % 10], col);
+}
+
 /* a feather with its tip at (x, y), the rest of it off at angle r (0: straight up from the tip) */
 static void feather(float x, float y, float r)
 {
