@@ -33,7 +33,7 @@ Builds 1 to 8 are dated 2026-11-15; builds 9 and 10 are 2026-11-16.
   - the scale and its home note are saved. They belong to the instrument, not to the sound: changing them does not switch to My Croc, and the PRESETS knob does not change them
 - **Checked:** simulator checks pass: the lit keys for C major and D harmonic minor match the scales note for note, they stay lit on the lily pad and teeth pages and while the croc hops, a key outside the scale still plays its own note, all of it is kept across a power cycle, and no key stays lit once the croc is asleep.
 - **Not checked:** how the three brightness levels look on the real keys. The simulator only knows lit and glowing.
-- **On the FM-1:** not reported yet.
+- **On the FM-1:** installed; the scales work great.
 
 ## Build 8: lily pad steps
 
@@ -45,7 +45,7 @@ Builds 1 to 8 are dated 2026-11-15; builds 9 and 10 are 2026-11-16.
   - the pads, their count, the hop and the speed are saved
 - **Under the hood:** a clock in the audio interrupt (for the arpeggiator to share); every note-on and note-off now happens in that interrupt, so keys and pads can no longer grab the same voice at once; the saved record has room for the lessons still to come, and saves from builds 5, 6 and 7 carry over.
 - **Checked:** simulator checks pass (planting, emptying, pad count, PLAY across pages, speed, all kept across a power cycle). Measured: at the default speed the notes land 0.285 s apart against 0.286 s expected, within 4 ms of each other. Saves made by builds 6 and 7 load with the croc's name and sound intact.
-- **On the FM-1:** not reported yet.
+- **On the FM-1:** installed; the sequencer works great.
 
 ## Build 7: swamp echo and the cave
 
