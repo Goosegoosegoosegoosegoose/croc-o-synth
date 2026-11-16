@@ -77,6 +77,7 @@ These are standard synthesizer concepts, not anything taken from a particular fi
 | Reverb | Cave |
 | Tempo | Hop speed |
 | Sequencer step | Lily pad |
+| Arpeggiator / direction / latch | Croc hops / way / keep |
 | Gate length | Hop |
 | Preset | Surprise |
 | User patch | My Croc |

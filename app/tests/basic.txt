@@ -1,7 +1,7 @@
 # Croc-O-Synth in the host simulator: ./build.sh --host, then
 #   app/build/host/crocosynth_host app/tests/basic.txt app/build/host
 # modes: 0 greeting, 1 playing, 2 goodbye, 3 asleep, 4 naming. pages: 0 home, 1 teeth, 2 coming soon, 3 envelope,
-# 4 tail wag, 5 grown-ups, 6 swamp echo, 7 lily pads, 8 safe swamp (scales)
+# 4 tail wag, 5 grown-ups, 6 swamp echo, 7 lily pads, 8 safe swamp (scales), 9 croc hops
 wait 300
 expect mode 0
 shot boot.png
@@ -135,7 +135,7 @@ tap GLO
 wait 100
 expect page 5
 shot glo.png
-tap ARP
+tap REC
 wait 100
 expect page 2
 shot soon.png

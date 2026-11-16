@@ -4,7 +4,23 @@ Every firmware build, newest first: what changed, what was checked, and what hap
 
 All of these are development builds, so the FM-1 reports the same identity for each (`FM-1_5800`). The commit is what tells them apart.
 
-Builds 1 to 8 are dated 2026-11-15; build 9 is 2026-11-16.
+Builds 1 to 8 are dated 2026-11-15; builds 9 and 10 are 2026-11-16.
+
+## Build 10: croc hops
+
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
+- **Added, on ARP:** croc hops, the arpeggiator. Hold down a few keys and the croc plays them one at a time, on the same beat as the lily pads.
+  - knob 1 **WAY**: which way the croc hops. No hops (keys sound together, as before), Up, Down, Up and down, Any way
+  - knob 2 **HOP**: how long each note lasts (the same setting as on the lily pads)
+  - knob 3 **KEEP**: keep hopping when you let go. A new key then starts a new handful
+  - the held keys show as stepping stones, low to high like stairs, with the croc hopping along them; the key being played lights up
+  - the speed is the SELECT knob's hop speed; it works on every page, and together with PLAY
+  - a goodbye, or turning the way to No hops, lets go of a kept handful
+- **Changed:** a change is now saved after a quarter of a minute even if something is still playing. Before, the save waited for silence, which never came while the lily pads (build 8) or a kept handful of hops was playing.
+- **Checked:** simulator checks pass, with a new script for the hops. Read back from recordings: three held keys came out C, E, G going up and G, E, C going down; four keys up and down came out C, E, G, C, G, E, C; the notes were 0.28 to 0.29 s apart at the default speed (0.286 expected).
+- **With safe swamp (build 9):** the key lights still show the scale while the croc hops; the key being played is fully lit.
+- **Not done:** the browser prototype still shows "coming soon" for ARP.
+- **On the FM-1:** not reported yet.
 
 ## Build 9: safe swamp (scales)
 

@@ -15,7 +15,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 9"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 10"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -31,8 +31,9 @@ typedef struct {
     uint8_t scale, scale_home, scale_unsafe;   /* safe swamp (the scale mode): 0 no scale or 1..NSCALE; the home note
                                               * 0..11 (C..B). The scale only lights its keys: every key still plays.
                                               * scale_unsafe is not used (kept 0, so the record keeps its shape) */
-    uint8_t arp;                         /* croc hops (the arpeggiator): 0 off */
-    uint8_t rsv[15];                     /* room for more: take from here, so the record keeps its size */
+    uint8_t arp;                         /* croc hops (the arpeggiator): 0 off, 1 up, 2 down, 3 up and down, 4 any way */
+    uint8_t arp_keep;                    /* 1: keep hopping when the keys are let go */
+    uint8_t rsv[14];                     /* room for more: take from here, so the record keeps its size */
 } settings_t;
 /* older records, read once and carried over, so an update keeps the croc's name and her sound */
 #define SET_MAGIC_V3 0x43524F33u         /* "CRO3": build 7 */
@@ -112,6 +113,8 @@ static void seq_from_settings(void)          /* the saved pads and speed into th
     seq.pads = set.seq_pads;
     seq.gate = set.seq_gate;
     seq.tempo = set.seq_tempo;
+    crochop.way = set.arp;
+    crochop.keep = set.arp_keep;
 }
 
 void app_init(void)
@@ -171,6 +174,8 @@ void app_init(void)
     if (set.scale > NSCALE || set.scale_home > 11)   /* only the scale is put back, not her sound */
         set.scale = set.scale_home = 0;
     set.scale_unsafe = 0;
+    if (set.arp > 4 || set.arp_keep > 1)     /* croc hops alone: back to off */
+        set.arp = set.arp_keep = 0;
     set.magic = SET_MAGIC;
     if (old)
         dirty_at = 1u;                       /* saved again in the new form */
@@ -180,7 +185,7 @@ void app_init(void)
 
 /* --------------------------------------------------------------------- UI --- */
 enum { M_BOOT, M_PLAY, M_BYE, M_OFF, M_NAME };
-enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ, PG_SCALE };
+enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ, PG_SCALE, PG_ARP };
 enum { OV_NONE, OV_SIZE, OV_JAWS, OV_TEMPO };
 enum { F_NONE = -1, F_K1, F_K2, F_K3, F_K4 };   /* which of KNOB 1 to 4 was turned last on this page */
 
@@ -197,7 +202,7 @@ static struct {
     uint32_t lit_scale, lit_home;        /* the keys glowing for the scale, and its home notes (brighter) */
 } ui;
 
-static const char *const SOON_NAME[NB] = {"", "", "", "", "", "", "", "SAVE", "CROC HOPS",
+static const char *const SOON_NAME[NB] = {"", "", "", "", "", "", "", "SAVE", "",
                                           "", "", "CROC REMEMBERS", "", ""};
 
 /* is this note in the scale that is set? (every note is, with no scale) */
@@ -259,7 +264,8 @@ static void set_mode(int m)
     ui.ov = OV_NONE;
     ui.home_t = ui.glo_t = 0;
     if (m != M_PLAY) {
-        seq.playing = 0;                     /* the croc stops hopping */
+        seq.playing = 0;                     /* the croc stops hopping, and lets go of the keys it kept */
+        crochop.flush++;
         notes_off();
     }
 }
@@ -411,6 +417,8 @@ static void input(void)
             go_page(PG_SEQ);
         } else if (k == B_SEL) {
             go_page(PG_SCALE);
+        } else if (k == B_ARP) {
+            go_page(PG_ARP);
         } else if (k == B_PLAY) {            /* the croc hops, or stops, whatever page is up */
             seq.playing = !seq.playing;
         } else if (k == B_GLO) {
@@ -473,6 +481,15 @@ static void input(void)
                     step(&snd.wag, d, 0, 8);
                 } else {
                     step(&snd.echo, d, 0, 6);
+                }
+            } else if (ui.page == PG_ARP) {  /* not part of the sound: saved, but it does not make My Croc */
+                uint8_t *v = k == 0 ? &set.arp : k == 1 ? &set.seq_gate : &set.arp_keep;
+                int32_t nv = clamp((int32_t)*v + d, 0, k == 0 ? 4 : k == 1 ? 4 : 1);
+                if (k == 3) {
+                    used = 0;
+                } else if (nv != *v) {
+                    *v = (uint8_t)nv;
+                    seq_changed();
                 }
             } else if (ui.page == PG_SEQ) {
                 if (k == 0) {                /* which pad a key plants on */
@@ -540,11 +557,12 @@ static void input(void)
     ui.btn = btn;
     plat_glow(1);
     {                                        /* this page's button; PLAY while the croc hops; the key the pad is playing */
-        int8_t sn = seq_sounding;
+        int8_t sn = seq_sounding, hn = crochop_sounding;
         uint32_t page_btn = ui.page == PG_HOME ? B_HOME : ui.page == PG_EDIT ? B_EDIT : ui.page == PG_ENV ? B_ENV
                             : ui.page == PG_LFO ? B_LFO : ui.page == PG_GLO ? B_GLO : ui.page == PG_FX ? B_FX
-                            : ui.page == PG_SEQ ? B_SEQ : ui.page == PG_SCALE ? B_SEL : ui.soon;
-        swamp_lights(1u << page_btn | (seq.playing ? 1u << B_PLAY : 0u), keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u));
+                            : ui.page == PG_SEQ ? B_SEQ : ui.page == PG_SCALE ? B_SEL : ui.page == PG_ARP ? B_ARP : ui.soon;
+        swamp_lights(1u << page_btn | (seq.playing ? 1u << B_PLAY : 0u), keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u) |
+                                                                             (hn >= 53 && hn < 53 + NKEYS ? 1u << (hn - 53) : 0u));
     }
 }
 
@@ -709,6 +727,69 @@ static void picture_scale(float t)
                     s_ellipse((float)x, 189.0f, 2.8f, 2.8f, home ? K_SUN : K_GLOW);
             }
         }
+    }
+    strip(KN, ui.focus);
+}
+
+/* croc hops: the held keys as stepping stones, low to high like stairs, and the croc hopping along them */
+static void picture_hops(float t)
+{
+    static const char *const KN[4] = {"WAY", "HOP", "KEEP", 0};
+    static const char *const NOTE[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    static const char *const HOPS[5] = {"TINY HOPS", "SHORT HOPS", "HOPS", "LONG HOPS", "SLIDING"};
+    static const char *const WAY[5] = {"NO HOPS", "UP", "DOWN", "UP AND DOWN", "ANY WAY"};
+    const char *what, *now;
+    croc_t c;
+    int32_t i, n = crochop_n, at = crochop_at, hx = 0, hy = 0, m;
+    uint8_t held[CROCHOP_MAX];
+    (void)t;
+    if (n > CROCHOP_MAX)
+        n = CROCHOP_MAX;
+    for (i = 0; i < n; i++)
+        held[i] = crochop_held[i];
+    scene(60);
+    t_center(120, 2, "CROC HOPS", K_INK, 228, 1);
+    if (ui.focus == F_K1) {
+        what = "WHICH WAY THE CROC HOPS";
+        now = WAY[set.arp];
+    } else if (ui.focus == F_K2) {
+        what = "HOW LONG EACH NOTE LASTS";
+        now = HOPS[set.seq_gate];
+    } else if (ui.focus == F_K3) {
+        what = "KEEP HOPPING WHEN YOU LET GO";
+        now = set.arp_keep ? "YES" : "NO";
+    } else {
+        what = "HOLD DOWN A FEW KEYS";
+        now = !set.arp ? "TURN KNOB 1 TO START" : n ? "HOP HOP HOP!" : "THE CROC HOPS ON THEM";
+    }
+    t_small(120, 27, what, K_INK);
+    t_center(120, 41, now, K_CROCD, 220, 0);
+    m_reset();
+    m = n ? n : 4;                           /* no keys held: four pale stones, waiting */
+    for (i = 0; i < m; i++) {
+        float sp = m > 1 ? fm_minf(44.0f, 188.0f / (float)(m - 1)) : 0.0f;
+        float px = 120.0f + ((float)i - (float)(m - 1) * 0.5f) * sp, py = 186.0f - (m > 1 ? (float)i * 78.0f / (float)(m - 1) : 39.0f);
+        int hot = n && i == at;
+        s_ellipse(px, py + 3.0f, 17.0f, 8.0f, RGB(74, 160, 178));
+        s_ellipse(px, py, 16.0f, 8.0f, !n ? RGB(140, 196, 200) : hot ? RGB(240, 224, 150) : RGB(168, 160, 140));
+        if (n) {
+            const char *nm = NOTE[held[i] % 12];
+            cv_text((int32_t)px - text_w(&FONT_T, nm) / 2, (int32_t)py - 5, &FONT_T, nm, K_INK);
+        }
+        if (hot) {
+            hx = (int32_t)px;
+            hy = (int32_t)py;
+        }
+    }
+    croc_look(&c);
+    if (hx) {                                /* hopping: up and down once a step */
+        uint32_t len = seq_len, pos = seq_pos;
+        float f = len ? fm_clampf((float)pos / (float)len, 0.0f, 1.0f) : 0.0f;
+        c.jaw = 0.7f;
+        croc_draw((float)hx + 8.0f, (float)hy - 13.0f - fm_sinf(f * 3.14159f) * 9.0f, 0.3f, &c);
+    } else {                                 /* waiting beside the first stone */
+        c.sleep = set.arp ? 0 : 1;
+        croc_draw(34.0f, 205.0f, 0.3f, &c);
     }
     strip(KN, ui.focus);
 }
@@ -985,6 +1066,10 @@ static void picture(float t)
         picture_scale(t);
         return;
     }
+    if (ui.page == PG_ARP) {
+        picture_hops(t);
+        return;
+    }
     if (ui.page == PG_FX) {
         static const char *const KN[4] = {"ECHO", "FAR", "CAVE", 0};
         static const char *const FAR[5] = {"VERY NEAR", "NEAR", "MIDDLE", "FAR", "VERY FAR"};
@@ -1090,7 +1175,9 @@ void app_frame(void)
         set_mode(M_BYE);
     if (ui.ov && now >= ui.ov_until)
         ui.ov = OV_NONE;
-    if (dirty_at && now - dirty_at > 3000u && !voices_sounding()) {   /* kept, a moment after a change */
+    /* kept, a moment after a change: in a quiet moment if there is one, and anyway after a quarter of a minute (the
+     * lily pads or a kept handful of hops can play for as long as she likes) */
+    if (dirty_at && now - dirty_at > 3000u && (!voices_sounding() || now - dirty_at > 15000u)) {
         if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0)
             dirty_at = 0;
         else
@@ -1148,6 +1235,14 @@ int app_expect(const char *what, int *got)
         *got = (int)ui.lit_home;
     else if (!strncmp(what, "keynote", 7))       /* keynoteK: the note key K (two digits) plays now */
         *got = (int)key_to_note((uint32_t)((what[7] - '0') * 10 + (what[8] - '0')));
+    else if (!strcmp(what, "arp"))
+        *got = set.arp;
+    else if (!strcmp(what, "arpkeep"))
+        *got = set.arp_keep;
+    else if (!strcmp(what, "arpn"))
+        *got = crochop_n;
+    else if (!strcmp(what, "arpat"))
+        *got = crochop_at;
     else if (!strncmp(what, "pad", 3) && what[3] >= '0' && what[3] < '0' + SEQ_N && !what[4])   /* padN: pad N's note */
         *got = set.seq_note[what[3] - '0'];
     else if (!strcmp(what, "named"))

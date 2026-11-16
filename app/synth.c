@@ -161,15 +161,119 @@ static void key_event(int32_t note, int on)
     evq[ev_w & 31u] = (uint8_t)((uint32_t)note | (on ? 0x80u : 0u));
     ev_w++;
 }
+
+/* ---------------------------------------------------- croc hops (the arp) --- */
+/* With a way chosen, held keys do not sound together: they go on a list, lowest first, and the clock below plays
+ * them one at a time. `keep` leaves the list in place when the keys are let go, until a new key starts a new one. */
+#define CROCHOP_MAX 8
+static struct {
+    volatile uint8_t way;                /* 0 off, 1 up, 2 down, 3 up and down, 4 any way (random) */
+    volatile uint8_t keep;               /* 1: keep hopping when the keys are let go */
+    volatile uint8_t flush;              /* the main loop bumps this to drop the list (a change of mode) */
+} crochop;
+static volatile uint8_t crochop_held[CROCHOP_MAX], crochop_n;   /* the list, for the screen too */
+static volatile int8_t crochop_at = -1;  /* which of them the croc is on (-1 none) */
+static volatile int8_t crochop_sounding = -1;   /* its note (-1 none), for the keys' lights */
+static uint8_t ch_way, ch_flush, ch_down, ch_fresh;
+static int8_t ch_note = -1, ch_dir = 1;
+static int32_t ch_gate_left;
+static uint32_t ch_rng = 0x2545F491u;
+
+static void crochop_sync(void)               /* the main loop changed the way, or asked for the list to go */
+{
+    uint8_t way = crochop.way, fl = crochop.flush;
+    if (way == ch_way && fl == ch_flush)
+        return;
+    if (fl != ch_flush || !way != !ch_way) { /* on, off, or a flush: nothing held over from before */
+        notes_off();
+        crochop_n = 0;
+        ch_down = 0;
+        ch_note = -1;
+        crochop_at = -1;
+        crochop_sounding = -1;
+    }
+    ch_way = way;
+    ch_flush = fl;
+}
+static void crochop_add(uint8_t note)
+{
+    uint8_t n = crochop_n, i, j;
+    if (crochop.keep && ch_down == 0)        /* the first key of a new handful replaces the kept one */
+        n = 0;
+    ch_down++;
+    if (n == 0)
+        ch_fresh = 1;
+    for (i = 0; i < n && crochop_held[i] < note; i++)
+        ;
+    if (i < n && crochop_held[i] == note) {
+        crochop_n = n;
+        return;
+    }
+    if (n >= CROCHOP_MAX)
+        return;
+    for (j = n; j > i; j--)
+        crochop_held[j] = crochop_held[j - 1];
+    crochop_held[i] = note;
+    crochop_n = (uint8_t)(n + 1u);
+}
+static void crochop_del(uint8_t note)
+{
+    uint8_t n = crochop_n, i;
+    if (ch_down)
+        ch_down--;
+    if (crochop.keep)
+        return;
+    for (i = 0; i < n; i++)
+        if (crochop_held[i] == note) {
+            for (; i + 1u < n; i++)
+                crochop_held[i] = crochop_held[i + 1];
+            crochop_n = (uint8_t)(n - 1u);
+            return;
+        }
+}
+/* the next one to hop to, by the way chosen */
+static uint8_t crochop_next(uint8_t n)
+{
+    int32_t at = crochop_at;
+    if (ch_fresh || at < 0 || at >= (int32_t)n) {
+        ch_fresh = 0;
+        ch_dir = 1;
+        return ch_way == 2 ? (uint8_t)(n - 1u) : 0;
+    }
+    if (n < 2)
+        return 0;
+    if (ch_way == 1)
+        return (uint8_t)((at + 1) % (int32_t)n);
+    if (ch_way == 2)
+        return (uint8_t)(at ? at - 1 : (int32_t)n - 1);
+    if (ch_way == 3) {
+        if (at + ch_dir < 0 || at + ch_dir >= (int32_t)n)
+            ch_dir = (int8_t)-ch_dir;
+        return (uint8_t)(at + ch_dir);
+    }
+    ch_rng = ch_rng * 1664525u + 1013904223u;
+    {
+        uint8_t r = (uint8_t)((ch_rng >> 16) % n);
+        return r == (uint8_t)at ? (uint8_t)((r + 1u) % n) : r;
+    }
+}
+
 static void key_events(void)
 {
+    crochop_sync();
     while (ev_r != ev_w) {
         uint8_t b = evq[ev_r & 31u];
         ev_r++;
-        if (b & 0x80u)
+        if (ch_way) {
+            if (b & 0x80u)
+                crochop_add(b & 0x7F);
+            else
+                crochop_del(b & 0x7F);
+        } else if (b & 0x80u) {
             note_on(b & 0x7F);
-        else
+        } else {
             note_off(b & 0x7F);
+        }
     }
 }
 
@@ -195,50 +299,78 @@ static int8_t sq_note = -1;
 static uint8_t sq_next, sq_was;
 static const float SEQ_GATE[5] = {0.25f, 0.45f, 0.65f, 0.85f, 0.98f};
 
+static uint8_t ck_run;
+
+/* One clock for the lily pads and for croc hops: it runs while either has something to play, and both step on the
+ * same beat. It starts with a step at once, so the first note is not late. */
 static void seq_tick(uint32_t n)             /* audio interrupt, once a block */
 {
-    uint32_t len;
-    if (!seq.playing) {
-        if (sq_was) {
-            if (sq_note >= 0)
-                note_off(sq_note);
-            sq_note = -1;
-            sq_was = 0;
-            seq_step = -1;
-            seq_sounding = -1;
-        }
-        return;
-    }
-    len = (uint32_t)(SRATE * 30.0f / (60.0f + 15.0f * (float)seq.tempo));
-    if (!sq_was) {                           /* PLAY: the first pad at once */
-        sq_was = 1;
-        sq_next = 0;
-        sq_count = len;
-    } else {
-        sq_count += n;
-    }
+    uint32_t len = (uint32_t)(SRATE * 30.0f / (60.0f + 15.0f * (float)seq.tempo));
+    float gate = SEQ_GATE[seq.gate > 4 ? 4 : seq.gate];
+    int run_seq = seq.playing, run_hop = ch_way && crochop_n;
     if (sq_note >= 0 && (sq_gate_left -= (int32_t)n) <= 0) {
         note_off(sq_note);
         sq_note = -1;
         seq_sounding = -1;
     }
-    if (sq_count >= len) {
-        uint8_t st = (uint8_t)(sq_next % (seq.pads ? seq.pads : 1u));
-        int8_t nt = seq.note[st];
-        sq_count -= len;
-        if (sq_count >= len)
-            sq_count = 0;
+    if (ch_note >= 0 && (ch_gate_left -= (int32_t)n) <= 0) {
+        note_off(ch_note);
+        ch_note = -1;
+        crochop_sounding = -1;
+    }
+    if (!run_seq && sq_was) {                /* PLAY again: the pads stop */
         if (sq_note >= 0)
             note_off(sq_note);
         sq_note = -1;
-        if (nt >= 0) {
-            note_on(nt);
-            sq_note = nt;
-            sq_gate_left = (int32_t)((float)len * SEQ_GATE[seq.gate > 4 ? 4 : seq.gate]);
+        sq_was = 0;
+        seq_step = -1;
+        seq_sounding = -1;
+    }
+    if (!run_hop)
+        crochop_at = -1;
+    if (!run_seq && !run_hop) {
+        ck_run = 0;
+        return;
+    }
+    if (!ck_run) {
+        ck_run = 1;
+        sq_count = len;
+    } else {
+        sq_count += n;
+    }
+    if (run_seq && !sq_was) {
+        sq_was = 1;
+        sq_next = 0;
+    }
+    if (sq_count >= len) {
+        sq_count -= len;
+        if (sq_count >= len)
+            sq_count = 0;
+        if (run_seq) {
+            uint8_t st = (uint8_t)(sq_next % (seq.pads ? seq.pads : 1u));
+            int8_t nt = seq.note[st];
+            if (sq_note >= 0)
+                note_off(sq_note);
+            sq_note = -1;
+            if (nt >= 0) {
+                note_on(nt);
+                sq_note = nt;
+                sq_gate_left = (int32_t)((float)len * gate);
+            }
+            seq_sounding = sq_note;
+            seq_step = (int8_t)st;
+            sq_next = (uint8_t)(st + 1u);
         }
-        seq_sounding = sq_note;
-        seq_step = (int8_t)st;
-        sq_next = (uint8_t)(st + 1u);
+        if (run_hop) {
+            uint8_t nn = crochop_n, at = crochop_next(nn);
+            if (ch_note >= 0)
+                note_off(ch_note);
+            ch_note = (int8_t)crochop_held[at];
+            note_on(ch_note);
+            ch_gate_left = (int32_t)((float)len * gate);
+            crochop_at = (int8_t)at;
+            crochop_sounding = ch_note;
+        }
     }
     seq_pos = sq_count;
     seq_len = len;

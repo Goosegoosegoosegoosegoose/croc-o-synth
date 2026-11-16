@@ -83,8 +83,8 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 | Work | Where | Status |
 | --- | --- | --- |
 | Lily pad sequencer (SEQ, PLAY), and the shared clock with the hop speed on SELECT | `main` | Done: build 8 |
-| Safe swamp, the scale mode (SCL) | branch `scale-mode` | Done: build 9 (not seen on a real FM-1 yet) |
-| Croc hops, the arpeggiator (ARP) | branch `arp` | Can start: the clock is in `synth.c` (`seq_tick`) |
+| Safe swamp, the scale mode (SCL) | `main` | Done: build 9 (not seen on a real FM-1 yet) |
+| Croc hops, the arpeggiator (ARP) | `main` | Done: build 10 (not seen on a real FM-1 yet) |
 | Croc remembers (REC), SAVE, challenges and stars | not started | |
 | The croc and background art | the owner | In progress |
 
@@ -92,4 +92,4 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 
 **Safe swamp (SCL).** Built in build 9. `SWAMP_SCALE` in `app.c` is the table of scales (add one there, with its name and its word in `SWAMP_NAME` and `SWAMP_FEEL`, and raise `NSCALE`); `key_to_note()` is the one place a key becomes a note (the scale does not change it: it only lights keys, by the owner's choice); `swamp_lights()` sets every light, on every page: the scale's keys glow, its home notes are half lit, held keys and the note a pad is playing are fully lit. An arpeggiator that lights keys should pass them to `swamp_lights()` as lit keys, so the scale stays underneath.
 
-**Croc hops (ARP).** Hold a few keys and the croc plays them one at a time: up, down, or random. It needs a clock: use the sequencer's (`seq_tick` in `synth.c`, with the hop speed on the SELECT knob); do not add a second one. The saved record has an `arp` byte waiting (0 must mean off).
+**Croc hops (ARP).** Done in build 10. In `synth.c` the held keys go on a list (`crochop_*`) and `seq_tick` steps through them on the lily pads' beat. While a way is chosen, a key press reaches the list, not the voices: anything that changes what a key plays (the scale mode's `key_to_note`) happens before that, in `app.c`, so the two work together.

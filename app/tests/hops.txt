@@ -1,0 +1,139 @@
+# Croc hops (the arpeggiator) in the host simulator:
+#   app/build/host/crocosynth_host app/tests/hops.txt app/build/host
+# page 9 is croc hops. arp: 0 off, 1 up, 2 down, 3 up and down, 4 any way
+wait 3000
+tap HOME
+wait 100
+# echo and cave off, so the recordings are the notes alone
+tap FX
+turn K1 -9
+turn K3 -9
+tap ARP
+expect page 9
+wait 100
+shot hops-off.png
+# off: held keys sound together, as always
+key 7 down
+key 11 down
+wait 60
+expect voices 2
+expect arpn 0
+key 7 up
+key 11 up
+wait 500
+expect voices 0
+# up: three held keys, one at a time
+turn K1 1
+expect arp 1
+key 7 down
+key 11 down
+key 14 down
+wav hops-up.wav
+wait 60
+expect arpn 3
+wait 1800
+wavstop
+shot hops-up.png
+key 7 up
+key 11 up
+key 14 up
+wait 500
+expect arpn 0
+expect voices 0
+# down
+turn K1 1
+expect arp 2
+key 7 down
+key 11 down
+key 14 down
+wav hops-down.wav
+wait 1800
+wavstop
+key 7 up
+key 11 up
+key 14 up
+wait 500
+# up and down, with four keys
+turn K1 1
+expect arp 3
+key 7 down
+key 11 down
+key 14 down
+key 19 down
+wav hops-updown.wav
+wait 2400
+wavstop
+key 7 up
+key 11 up
+key 14 up
+key 19 up
+wait 500
+expect voices 0
+# keep: the croc goes on hopping after the keys are let go; a new key starts a new handful
+turn K3 1
+expect arpkeep 1
+wait 100
+shot hops-keep.png
+key 7 down
+key 11 down
+wait 60
+key 7 up
+key 11 up
+wait 700
+expect arpn 2
+shot hops-kept.png
+key 14 down
+wait 60
+key 14 up
+wait 100
+expect arpn 1
+# longer hops, shared with the lily pads
+turn K2 2
+expect hop 4
+# PLAY at the same time: the pads and the hops share the beat
+tap PLAY
+wait 700
+expect playing 1
+expect arpn 1
+tap PLAY
+# kept across a power cycle (the way and keep; not the held keys). The kept handful is still hopping, so the save
+# waits for its quarter of a minute
+wait 3600
+expect store_writes 0
+wait 12500
+expect store_writes >0
+reboot
+wait 3200
+expect arp 3
+expect arpkeep 1
+expect arpn 0
+# off again: nothing left hopping, and keys sound together again
+tap ARP
+turn K1 -9
+expect arp 0
+turn K3 -9
+expect arpkeep 0
+key 7 down
+key 11 down
+wait 60
+expect voices 2
+key 7 up
+key 11 up
+wait 600
+expect voices 0
+# goodbye stops a kept handful
+turn K1 1
+turn K3 1
+key 7 down
+wait 60
+key 7 up
+wait 300
+expect arpn 1
+press HOME
+wait 1000
+expect mode 2
+release HOME
+wait 300
+expect arpn 0
+wait 600
+expect voices 0
