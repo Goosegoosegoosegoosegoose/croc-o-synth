@@ -6,6 +6,11 @@ All of these are development builds, so the FM-1 reports the same identity for e
 
 Builds 1 to 8 are dated 2026-11-15; builds 9 to 13 are 2026-11-16.
 
+## Web app (no new firmware build)
+
+- The firmware is now also built for the browser on every build and published at <https://goosegoosegoosegoosegoose.github.io/croc-o-synth/>. It is the same code as the FM-1 runs, inside fm1-base's emulator page.
+- **Checked:** the published page opened in a headless Chrome: it starts and shows the name-your-croc screen. Sound was not listened to there.
+
 ## Build 13: croc songs
 
 - Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.

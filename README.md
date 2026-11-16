@@ -58,6 +58,12 @@ The simulator runs a script of presses and turns and writes screenshots and audi
 
 Each firmware build and what changed in it is listed in [CHANGELOG.md](CHANGELOG.md). To work on the firmware, start with [DEVELOPING.md](DEVELOPING.md).
 
+## In the browser
+
+The same firmware code, compiled for the browser, with a drawn FM-1 to click and play: <https://goosegoosegoosegoosegoose.github.io/croc-o-synth/>
+
+It is rebuilt from `main` on every build (the `web` job in `.github/workflows/build.yml`, published to the `gh-pages` branch). The page and the emulator around the firmware are fm1-base's (MPL-2.0). What it saves stays in that browser. `prototype/index.html` is the older hand-written prototype and is behind.
+
 ## Not built yet
 
 - Saving the recorded tune (it lasts until the power goes off)

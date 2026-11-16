@@ -56,6 +56,7 @@ These are places where our design does the same job with the same control as Fel
 | SCL | Scale | Safe swamp: a scale and its home note; the scale's keys stay lit on every page, and every key still plays | Same area, our own design and code |
 | ARP, REC | Arpeggiator, record | Croc hops, Croc remembers | Same areas |
 | SEQ pressed again | (nothing) | Croc songs: eight nursery tunes | Traditional melodies, out of copyright; written out by hand as note lists in `app/synth.c`, not taken from any file or firmware |
+| (web app) | fm1-base's browser emulator | Used as it is: `./build.sh --web` builds `base/web/emu/` (page, worklet, panel drawing; MPL-2.0, Charles Vestal) around this firmware with Emscripten (MIT). Only the page's title is changed, at publish time | Nothing copied into this repository's own files |
 | SAVE | Save a preset | Challenges and stars (settings save themselves, so the button was free) | Own idea; nothing taken |
 
 ## 4. Renamed synth terms (our names for standard ideas)
