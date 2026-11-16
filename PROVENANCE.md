@@ -55,6 +55,7 @@ These are places where our design does the same job with the same control as Fel
 | GLO | Mixer, global, system; hold for mutes | Grown-ups; hold to name the croc | Similar press, hold different |
 | SCL | Scale | Safe swamp: a scale and its home note; the scale's keys stay lit on every page, and every key still plays | Same area, our own design and code |
 | ARP, REC | Arpeggiator, record | Croc hops, Croc remembers | Same areas |
+| SEQ pressed again | (nothing) | Croc songs: eight nursery tunes | Traditional melodies, out of copyright; written out by hand as note lists in `app/synth.c`, not taken from any file or firmware |
 | SAVE | Save a preset | Challenges and stars (settings save themselves, so the button was free) | Own idea; nothing taken |
 
 ## 4. Renamed synth terms (our names for standard ideas)

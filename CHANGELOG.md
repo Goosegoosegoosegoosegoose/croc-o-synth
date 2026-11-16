@@ -4,7 +4,22 @@ Every firmware build, newest first: what changed, what was checked, and what hap
 
 All of these are development builds, so the FM-1 reports the same identity for each (`FM-1_5800`). The commit is what tells them apart.
 
-Builds 1 to 8 are dated 2026-11-15; builds 9 to 12 are 2026-11-16.
+Builds 1 to 8 are dated 2026-11-15; builds 9 to 13 are 2026-11-16.
+
+## Build 13: croc songs
+
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
+- **Added, on SEQ:** eight ready-made songs. Press **SEQ** again on the lily pads page to switch between her own pads and the croc's songs.
+  - knob 1 **SONG** picks: Twinkle Twinkle, Itsy Bitsy Spider, Mary Had a Lamb, Row Your Boat, Hot Cross Buns, Old MacDonald, Are You Sleeping, London Bridge
+  - **PLAY** sings it, round and round with a short breath at the end; a newly picked song starts from its beginning
+  - the song's notes show as lily pads, eight at a time, with the croc on the one it is singing; the key for each note lights up, to play along
+  - knob 3 **HOP** (note length) and the SELECT knob (speed) work as on the lily pads. The song is sung in the croc's current sound
+  - her own eight pads are left untouched, and keys do not plant notes while the songs are up
+- **Saved:** which song (or her own pads), in one of the spare bytes.
+- **Changed:** the four-lily-pads challenge needs her own pads, not a song.
+- **Checked:** simulator checks pass, with a new script: the first notes of Twinkle Twinkle and Itsy Bitsy Spider at the right times, a new song starting at once, her pads untouched, the song kept through a power cycle. Screens looked at.
+- **Not checked:** the tunes were written out by hand from memory and have not been listened to: a wrong note or rhythm is possible in any of them, the six not in the script especially.
+- **On the FM-1:** not installed yet.
 
 ## Build 12: challenges and stars
 

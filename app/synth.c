@@ -416,6 +416,7 @@ typedef struct {
     volatile uint8_t gate;               /* 0..4: how long each note lasts, tiny hops to sliding */
     volatile uint8_t tempo;              /* 0..8: hop speed, 60 to 180 beats a minute */
     volatile uint8_t playing;
+    volatile uint8_t song;               /* 0: her own pads. 1..NSONG: a ready-made song, played by the same clock */
 } seq_t;
 static seq_t seq;
 static volatile int8_t seq_step = -1;    /* the pad the croc is on (-1: not hopping), for the screen */
@@ -428,6 +429,45 @@ static uint8_t sq_next, sq_was;
 static const float SEQ_GATE[5] = {0.25f, 0.45f, 0.65f, 0.85f, 0.98f};
 
 static uint8_t ck_run;
+
+/* The croc's songs: old nursery tunes (all traditional, long out of copyright), written out here by hand as
+ * {key, steps} pairs. The key is the printed one (60 is middle C; 0 a rest) and a step is the clock's, half a beat. */
+#define R 0
+static const uint8_t SG_TWINKLE[] = {60,2, 60,2, 67,2, 67,2, 69,2, 69,2, 67,4, 65,2, 65,2, 64,2, 64,2, 62,2, 62,2, 60,4,
+                                     67,2, 67,2, 65,2, 65,2, 64,2, 64,2, 62,4, 67,2, 67,2, 65,2, 65,2, 64,2, 64,2, 62,4,
+                                     60,2, 60,2, 67,2, 67,2, 69,2, 69,2, 67,4, 65,2, 65,2, 64,2, 64,2, 62,2, 62,2, 60,4};
+static const uint8_t SG_SPIDER[] = {67,1, 60,2, 60,1, 60,2, 62,1, 64,3, 64,2, 64,1, 62,2, 60,1, 62,2, 64,1, 60,3, R,3,
+                                    64,3, 64,2, 65,1, 67,3, R,2, 67,1, 65,2, 64,1, 65,2, 67,1, 64,3, R,3,
+                                    60,3, 60,2, 62,1, 64,3, R,2, 64,1, 62,2, 60,1, 62,2, 64,1, 60,3, R,1, 67,1, 67,1,
+                                    60,2, 60,1, 60,2, 62,1, 64,3, 64,2, 64,1, 62,2, 60,1, 62,2, 64,1, 60,3};
+static const uint8_t SG_MARY[] = {64,2, 62,2, 60,2, 62,2, 64,2, 64,2, 64,4, 62,2, 62,2, 62,4, 64,2, 67,2, 67,4,
+                                  64,2, 62,2, 60,2, 62,2, 64,2, 64,2, 64,2, 64,2, 62,2, 62,2, 64,2, 62,2, 60,8};
+static const uint8_t SG_ROW[] = {60,3, 60,3, 60,2, 62,1, 64,3, 64,2, 62,1, 64,2, 65,1, 67,6,
+                                 72,1, 72,1, 72,1, 67,1, 67,1, 67,1, 64,1, 64,1, 64,1, 60,1, 60,1, 60,1,
+                                 67,2, 65,1, 64,2, 62,1, 60,6};
+static const uint8_t SG_BUNS[] = {64,2, 62,2, 60,4, 64,2, 62,2, 60,4, 60,1, 60,1, 60,1, 60,1, 62,1, 62,1, 62,1, 62,1,
+                                  64,2, 62,2, 60,4};
+static const uint8_t SG_FARM[] = {67,2, 67,2, 67,2, 62,2, 64,2, 64,2, 62,4, 71,2, 71,2, 69,2, 69,2, 67,6, 62,2,
+                                  67,2, 67,2, 67,2, 62,2, 64,2, 64,2, 62,4, 71,2, 71,2, 69,2, 69,2, 67,8};
+static const uint8_t SG_JOHN[] = {60,2, 62,2, 64,2, 60,2, 60,2, 62,2, 64,2, 60,2, 64,2, 65,2, 67,4, 64,2, 65,2, 67,4,
+                                  67,1, 69,1, 67,1, 65,1, 64,2, 60,2, 67,1, 69,1, 67,1, 65,1, 64,2, 60,2,
+                                  60,2, 55,2, 60,4, 60,2, 55,2, 60,4};
+static const uint8_t SG_BRIDGE[] = {67,3, 69,1, 67,2, 65,2, 64,2, 65,2, 67,4, 62,2, 64,2, 65,4, 64,2, 65,2, 67,4,
+                                    67,3, 69,1, 67,2, 65,2, 64,2, 65,2, 67,4, 62,4, 67,4, 64,2, 60,6};
+#undef R
+#define NSONG 8
+typedef struct {
+    const char *name;
+    const uint8_t *ev;
+    uint8_t n;                           /* how many notes and rests */
+} song_t;
+#define SONG_OF(nm, a) {nm, a, (uint8_t)(sizeof(a) / 2)}
+static const song_t SONG[NSONG] = {
+    SONG_OF("TWINKLE TWINKLE", SG_TWINKLE), SONG_OF("ITSY BITSY SPIDER", SG_SPIDER), SONG_OF("MARY HAD A LAMB", SG_MARY),
+    SONG_OF("ROW YOUR BOAT", SG_ROW),       SONG_OF("HOT CROSS BUNS", SG_BUNS),      SONG_OF("OLD MACDONALD", SG_FARM),
+    SONG_OF("ARE YOU SLEEPING", SG_JOHN),   SONG_OF("LONDON BRIDGE", SG_BRIDGE),
+};
+static uint8_t sg_song, sg_at, sg_wait;  /* the song being played, the next note in it, steps until that note */
 
 /* One clock for the lily pads and for croc hops: it runs while either has something to play, and both step on the
  * same beat. It starts with a step at once, so the first note is not late. */
@@ -466,15 +506,41 @@ static void seq_tick(uint32_t n)             /* audio interrupt, once a block */
     } else {
         sq_count += n;
     }
-    if (run_seq && !sq_was) {
+    if (run_seq && (!sq_was || seq.song != sg_song)) {   /* PLAY, or another song picked: from the start */
         sq_was = 1;
         sq_next = 0;
+        sg_song = seq.song <= NSONG ? seq.song : 0;
+        sg_at = sg_wait = 0;
+        sq_count = len;                      /* its first note now, not at the next step */
     }
     if (sq_count >= len) {
         sq_count -= len;
         if (sq_count >= len)
             sq_count = 0;
-        if (run_seq) {
+        if (run_seq && sg_song) {            /* a song: each note lasts its own number of steps */
+            const song_t *sg = &SONG[sg_song - 1];
+            if (!sg_wait) {
+                if (sq_note >= 0)
+                    note_off(sq_note);
+                sq_note = -1;
+                if (sg_at >= sg->n) {        /* the end: a breath, then round again */
+                    sg_at = 0;
+                    sg_wait = 4;
+                    seq_step = -1;
+                } else {
+                    uint8_t nt = sg->ev[2 * sg_at];
+                    sg_wait = sg->ev[2 * sg_at + 1];
+                    if (nt) {
+                        note_on(nt);
+                        sq_note = (int8_t)nt;
+                        sq_gate_left = (int32_t)((float)len * ((float)(sg_wait - 1) + gate));
+                    }
+                    seq_step = (int8_t)sg_at++;
+                }
+                seq_sounding = sq_note;
+            }
+            sg_wait--;
+        } else if (run_seq) {
             uint8_t st = (uint8_t)(sq_next % (seq.pads ? seq.pads : 1u));
             int8_t nt = seq.note[st];
             if (sq_note >= 0)

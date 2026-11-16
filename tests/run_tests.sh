@@ -8,4 +8,5 @@ app/build/host/crocosynth_host app/tests/sound.txt app/build/host
 app/build/host/crocosynth_host app/tests/hops.txt app/build/host
 app/build/host/crocosynth_host app/tests/remembers.txt app/build/host
 app/build/host/crocosynth_host app/tests/stars.txt app/build/host
+app/build/host/crocosynth_host app/tests/songs.txt app/build/host
 echo "tests: ok"

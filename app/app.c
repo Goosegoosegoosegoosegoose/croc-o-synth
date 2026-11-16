@@ -15,7 +15,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 12"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 13"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -35,7 +35,8 @@ typedef struct {
     uint8_t arp_keep;                    /* 1: keep hopping when the keys are let go */
     uint8_t star_lo, star_hi;            /* the stars won, a bit a challenge (SAVE) */
     uint8_t chal;                        /* the challenge she has picked */
-    uint8_t rsv[11];                     /* room for more: take from here, so the record keeps its size */
+    uint8_t song;                        /* 0: the lily pads play her own notes. 1..NSONG: one of the croc's songs */
+    uint8_t rsv[10];                     /* room for more: take from here, so the record keeps its size */
 } settings_t;
 /* older records, read once and carried over, so an update keeps the croc's name and her sound */
 #define SET_MAGIC_V3 0x43524F33u         /* "CRO3": build 7 */
@@ -115,6 +116,7 @@ static void seq_from_settings(void)          /* the saved pads and speed into th
     seq.pads = set.seq_pads;
     seq.gate = set.seq_gate;
     seq.tempo = set.seq_tempo;
+    seq.song = set.song;
     crochop.way = set.arp;
     crochop.keep = set.arp_keep;
 }
@@ -154,7 +156,7 @@ static int chal_done(int i)                  /* is challenge i done, as things a
     case 5: return snd.wag > 0 && snd.wag_to == 1;
     case 6: return snd.wag >= 6 && snd.wag_size == 4;
     case 7: return snd.echo >= 5 && snd.cave >= 5;
-    case 8: return set.seq_pads == 4 && seq.playing;
+    case 8: return set.seq_pads == 4 && seq.playing && !set.song;
     case 9: return set.arp == 3 && crochop_n >= 3;
     case 10: return crocmem_state == CM_SING && crocmem_n >= 8;
     default: return set.scale != 0;
@@ -229,6 +231,8 @@ void app_init(void)
         set.arp = set.arp_keep = 0;
     if (set.chal >= NCHAL)
         set.chal = 0;
+    if (set.song > NSONG)
+        set.song = 0;
     set.magic = SET_MAGIC;
     if (old)
         dirty_at = 1u;                       /* saved again in the new form */
@@ -250,6 +254,7 @@ static struct {
     uint32_t t0;                         /* when this mode began */
     uint32_t ov_until, home_t, glo_t, save_t, last_draw, last_touch;
     uint32_t star_until;                 /* a star was just won: the cheer is on the screen until then */
+    uint8_t song_last;                   /* the song she was on, to come back to */
     uint8_t star_won;                    /* which challenge that was */
     uint8_t chal_armed;                  /* the picked challenge has been seen not done: doing it now wins the star */
     uint32_t keys, btn;
@@ -441,7 +446,7 @@ static void input(void)
         if (key_dn & bit) {
             int32_t note = key_to_note(k);
             ui.key_note[k] = note < 0 ? 0 : (uint8_t)note;
-            if (note >= 0 && ui.page == PG_SEQ && !ui.ov) {   /* on the lily pads a key also plants its note */
+            if (note >= 0 && ui.page == PG_SEQ && !ui.ov && !set.song) {   /* on the lily pads a key also plants its note */
                 set.seq_note[ui.seq_cur] = (int8_t)note;
                 ui.seq_cur = (uint8_t)((ui.seq_cur + 1u) % set.seq_pads);
                 seq_changed();
@@ -475,6 +480,12 @@ static void input(void)
         } else if (k == B_FX) {
             go_page(PG_FX);
         } else if (k == B_SEQ) {
+            if (ui.page == PG_SEQ) {         /* SEQ again: her own pads, or the croc's songs */
+                if (set.song)
+                    ui.song_last = set.song;
+                set.song = set.song ? 0 : ui.song_last ? ui.song_last : 1;
+                seq_changed();
+            }
             go_page(PG_SEQ);
         } else if (k == B_SEL) {
             go_page(PG_SCALE);
@@ -596,6 +607,19 @@ static void input(void)
                 } else if (nv != *v) {
                     *v = (uint8_t)nv;
                     seq_changed();
+                }
+            } else if (ui.page == PG_SEQ && set.song) {      /* the croc's songs */
+                if (k == 0) {
+                    int32_t ns = clamp((int32_t)set.song + d, 1, NSONG);
+                    if (ns != set.song) {
+                        set.song = (uint8_t)ns;
+                        seq_changed();
+                    }
+                } else if (k == 2) {
+                    set.seq_gate = (uint8_t)clamp((int32_t)set.seq_gate + d, 0, 4);
+                    seq_changed();
+                } else {
+                    used = 0;
                 }
             } else if (ui.page == PG_SEQ) {
                 if (k == 0) {                /* which pad a key plants on */
@@ -728,6 +752,53 @@ static void num_text(char *b, int32_t v, const char *before, const char *after) 
     *b = 0;
 }
 
+/* the croc's songs: the song's name, and its notes as lily pads, eight at a time, with the croc on the one it sings */
+static void picture_song(float t)
+{
+    static const char *const KN[4] = {"SONG", 0, "HOP", 0};
+    static const char *const HOPS[5] = {"TINY HOPS", "SHORT HOPS", "HOPS", "LONG HOPS", "SLIDING"};
+    const song_t *sg = &SONG[set.song - 1];
+    croc_t c;
+    int32_t i, st = seq_step, base, hx = 0, hy = 0;
+    (void)t;
+    if (st >= sg->n)
+        st = -1;
+    base = st < 0 ? 0 : st / 8 * 8;
+    scene(60);
+    t_center(120, 2, "CROC SONGS", K_INK, 228, 1);
+    t_small(120, 27, ui.focus == F_K3 ? "HOW LONG EACH NOTE LASTS" : seq.playing ? "PLAY ALONG ON THE LIT KEYS"
+                                                                                 : "PLAY: SING. SEQ: YOUR PADS", K_INK);
+    t_center(120, 41, ui.focus == F_K3 ? HOPS[set.seq_gate] : sg->name, K_CROCD, 220, 0);
+    m_reset();
+    for (i = 0; i < 8; i++) {
+        float px = 36.0f + (float)(i % 4) * 56.0f, py = i < 4 ? 106.0f : 164.0f;
+        int32_t e = base + i;
+        int on = e < sg->n, hot = on && e == st;
+        uint8_t nt = on ? sg->ev[2 * e] : 0;
+        s_ellipse(px, py, 23.0f, 13.0f, !on || !nt ? RGB(98, 186, 196) : hot ? RGB(155, 232, 115) : RGB(79, 174, 69));
+        s_tri(px + 4.0f, py, px + 25.0f, py - 6.5f, px + 25.0f, py + 6.5f, K_WATER);
+        if (nt) {
+            const char *nm = NOTE_NAME[nt % 12];
+            cv_text((int32_t)px - 6 - text_w(&FONT_B, nm) / 2, (int32_t)py - 8, &FONT_B, nm, RGB(13, 51, 25));
+        }
+        if (hot) {
+            hx = (int32_t)px;
+            hy = (int32_t)py;
+        }
+    }
+    croc_look(&c);
+    if (hx) {
+        uint32_t len = seq_len, pos = seq_pos;
+        float f = len ? fm_clampf((float)pos / (float)len, 0.0f, 1.0f) : 0.0f;
+        c.jaw = sg->ev[2 * st] ? 0.7f : 0.1f;
+        croc_draw((float)hx + 8.0f, (float)hy - 15.0f - fm_sinf(f * 3.14159f) * 9.0f, 0.3f, &c);
+    } else {
+        c.sleep = seq.playing ? 0 : 1;
+        croc_draw(44.0f, 91.0f, 0.3f, &c);
+    }
+    strip(KN, ui.focus);
+}
+
 static void picture_seq(float t)
 {
     static const char *const KN[4] = {"PAD", "HOW MANY", "HOP", "EMPTY"};
@@ -755,7 +826,7 @@ static void picture_seq(float t)
         now = set.seq_note[ui.seq_cur] < 0 ? "EMPTY" : "HAS A NOTE";
     } else {
         what = "PRESS A KEY TO PLANT A NOTE";
-        now = seq.playing ? "HOP HOP HOP!" : "PRESS PLAY TO HOP";
+        now = seq.playing ? "HOP HOP HOP!" : "PLAY: HOP. SEQ: SONGS";
     }
     t_small(120, 27, what, K_INK);
     t_center(120, 41, now, K_CROCD, 220, 0);
@@ -1307,7 +1378,10 @@ static void picture(float t)
         return;
     }
     if (ui.page == PG_SEQ) {
-        picture_seq(t);
+        if (set.song)
+            picture_song(t);
+        else
+            picture_seq(t);
         return;
     }
     if (ui.page == PG_SCALE) {
@@ -1488,6 +1562,10 @@ int app_expect(const char *what, int *got)
         *got = seq.playing;
     else if (!strcmp(what, "step"))
         *got = seq_step;
+    else if (!strcmp(what, "song"))
+        *got = set.song;
+    else if (!strcmp(what, "sounding"))          /* the key the pads or the song are playing now, -1 none */
+        *got = seq_sounding;
     else if (!strcmp(what, "pads"))
         *got = set.seq_pads;
     else if (!strcmp(what, "cursor"))

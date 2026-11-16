@@ -1,0 +1,65 @@
+# The croc's songs (SEQ pressed again on the lily pads) in the host simulator:
+#   app/build/host/crocosynth_host app/tests/songs.txt app/build/host
+# song: 0 her own pads, 1..8 a song. sounding: the key being played (60 is C), -1 none. step: the note in the song.
+wait 3000
+tap HOME
+wait 100
+tap SEQ
+expect page 7
+expect song 0
+wait 100
+shot song-pads.png
+tap SEQ
+expect song 1
+wait 100
+shot song-first.png
+# twinkle twinkle at the speed it starts with (a step is a quarter of a second): C C G G A A G
+tap PLAY
+wait 100
+expect step 0
+expect sounding 60
+wait 1150
+expect step 2
+expect sounding 67
+wait 1100
+expect step 4
+expect sounding 69
+wait 100
+shot song-playing.png
+# a key does not plant a note while a song is up
+key 3 down
+wait 50
+key 3 up
+# another song starts from its beginning: itsy bitsy spider starts on G
+turn K1 1
+expect song 2
+wait 50
+expect step 0
+expect sounding 67
+wait 2400
+shot song-spider.png
+tap PLAY
+wait 100
+expect step -1
+# the last song, and no further
+turn K1 9
+expect song 8
+wait 100
+shot song-last.png
+# back to her own pads, untouched, and the song is remembered
+tap SEQ
+expect song 0
+wait 100
+tap SEQ
+expect song 8
+# kept across a power cycle
+wait 3500
+expect store_writes >0
+reboot
+wait 3200
+expect song 8
+tap SEQ
+expect page 7
+expect song 8
+tap SEQ
+expect song 0
