@@ -78,6 +78,7 @@ These are standard synthesizer concepts, not anything taken from a particular fi
 | Tempo | Hop speed |
 | Sequencer step | Lily pad |
 | Arpeggiator / direction / latch | Croc hops / way / keep |
+| Note recorder and looper | Croc remembers |
 | Gate length | Hop |
 | Preset | Surprise |
 | User patch | My Croc |

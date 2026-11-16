@@ -4,7 +4,24 @@ Every firmware build, newest first: what changed, what was checked, and what hap
 
 All of these are development builds, so the FM-1 reports the same identity for each (`FM-1_5800`). The commit is what tells them apart.
 
-Builds 1 to 8 are dated 2026-11-15; builds 9 and 10 are 2026-11-16.
+Builds 1 to 8 are dated 2026-11-15; builds 9 to 11 are 2026-11-16.
+
+## Build 11: croc remembers
+
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
+- **Added, on REC:** croc remembers. The croc listens to a tune on the keys and sings it back.
+  - **REC** once: the croc waits, listening. The tune starts with the first key. PLAY turns red while it listens
+  - **REC** again: it sings the tune back, again and again. The sound can be changed and other pages opened while it sings
+  - **REC** a third time: quiet. The tune is kept: on this page **PLAY** sings it again, and stops it. On every other page PLAY is still the lily pads
+  - knob 1 **SPEED**: how fast the croc sings it. Slow (half speed), the same, fast (double)
+  - knob 2 **AGAIN**: sing it again and again, or just once
+  - the tune shows as dots, left to right in time, higher notes higher, with a line where the singing is; the keys it sings light up
+  - up to 120 notes or half a minute; then it starts singing by itself
+- **Limits:** the tune lasts until the power goes off (it is not saved). It keeps what the keys did, not the sound, so it is sung in whatever sound the croc has now.
+- **Checked:** simulator checks pass, with a new script. Read back from a recording: three notes played at 0, 0.40 and 1.10 s came back at 0, 0.39 and 1.09 s, and the tune came round again every 1.60 s.
+- **Not checked:** the red PLAY light. The simulator has no colours; on the device it relies on PLAY's first light being the red one.
+- **Not done:** the browser prototype still shows "coming soon" for REC.
+- **On the FM-1:** not reported yet.
 
 ## Build 10: croc hops
 

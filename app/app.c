@@ -15,7 +15,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 10"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 11"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -117,6 +117,12 @@ static void seq_from_settings(void)          /* the saved pads and speed into th
     crochop.keep = set.arp_keep;
 }
 
+static void crocmem_ask(int what)             /* croc remembers: listen, sing, be quiet (synth.c does it) */
+{
+    crocmem.cmd = (uint8_t)what;
+    crocmem.cmd_n++;
+}
+
 void app_init(void)
 {
     static union {
@@ -180,12 +186,14 @@ void app_init(void)
     if (old)
         dirty_at = 1u;                       /* saved again in the new form */
     seq_from_settings();
+    crocmem.rate = 1;                        /* sung back at the speed it was played, again and again */
+    crocmem.again = 1;
     snd = set.preset < NPRESET ? PRESET[set.preset] : set.mine;
 }
 
 /* --------------------------------------------------------------------- UI --- */
 enum { M_BOOT, M_PLAY, M_BYE, M_OFF, M_NAME };
-enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ, PG_SCALE, PG_ARP };
+enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ, PG_SCALE, PG_ARP, PG_REC };
 enum { OV_NONE, OV_SIZE, OV_JAWS, OV_TEMPO };
 enum { F_NONE = -1, F_K1, F_K2, F_K3, F_K4 };   /* which of KNOB 1 to 4 was turned last on this page */
 
@@ -200,10 +208,11 @@ static struct {
     uint8_t ncur;
     uint8_t seq_cur;                     /* the lily pad a key plants its note on */
     uint32_t lit_scale, lit_home;        /* the keys glowing for the scale, and its home notes (brighter) */
+    uint8_t play_red;                    /* PLAY's red light, not its green one: the croc is listening */
 } ui;
 
 static const char *const SOON_NAME[NB] = {"", "", "", "", "", "", "", "SAVE", "",
-                                          "", "", "CROC REMEMBERS", "", ""};
+                                          "", "", "", "", ""};
 
 /* is this note in the scale that is set? (every note is, with no scale) */
 static int swamp_has(int32_t note)
@@ -226,7 +235,7 @@ static void swamp_lights(uint32_t buttons, uint32_t keys)
     }
     ui.lit_scale = sc;
     ui.lit_home = home;
-    b = (b & ~play) | (b & play ? LED_PLAY_GREEN : 0u);
+    b = (b & ~play) | (b & play ? (ui.play_red ? play : LED_PLAY_GREEN) : 0u);
     dim = (dim & ~play) | (dim & play ? LED_PLAY_GREEN : 0u);
     plat_lights(b, keys, dim, sc, 2);
     plat_lights_mid(set.scale ? 1u << B_SEL : 0u, home);
@@ -266,6 +275,7 @@ static void set_mode(int m)
     if (m != M_PLAY) {
         seq.playing = 0;                     /* the croc stops hopping, and lets go of the keys it kept */
         crochop.flush++;
+        crocmem_ask(CM_DO_QUIET);
         notes_off();
     }
 }
@@ -419,8 +429,23 @@ static void input(void)
             go_page(PG_SCALE);
         } else if (k == B_ARP) {
             go_page(PG_ARP);
-        } else if (k == B_PLAY) {            /* the croc hops, or stops, whatever page is up */
-            seq.playing = !seq.playing;
+        } else if (k == B_REC) {             /* croc remembers: listen; then sing it back; then quiet */
+            uint8_t st = crocmem_state;
+            go_page(PG_REC);
+            crocmem_ask(st == CM_QUIET ? CM_DO_LISTEN : st == CM_LISTEN ? CM_DO_SING_NOW : CM_DO_QUIET);
+        } else if (k == B_PLAY) {            /* the croc hops, or stops, whatever page is up; on the remembering
+                                              * page it sings the tune again, or stops singing */
+            uint8_t st = crocmem_state;
+            if (seq.playing)
+                seq.playing = 0;
+            else if (ui.page == PG_REC && st == CM_SING)
+                crocmem_ask(CM_DO_QUIET);
+            else if (ui.page == PG_REC && st == CM_QUIET && crocmem_n)
+                crocmem_ask(CM_DO_SING);
+            else if (ui.page == PG_REC && st != CM_QUIET)
+                ;                            /* listening: PLAY waits */
+            else
+                seq.playing = 1;
         } else if (k == B_GLO) {
             go_page(PG_GLO);
             ui.glo_t = now | 1u;
@@ -482,6 +507,13 @@ static void input(void)
                 } else {
                     step(&snd.echo, d, 0, 6);
                 }
+            } else if (ui.page == PG_REC) {  /* how it is sung back: not saved */
+                if (k == 0)
+                    crocmem.rate = (uint8_t)clamp((int32_t)crocmem.rate + d, 0, 2);
+                else if (k == 1)
+                    crocmem.again = (uint8_t)clamp((int32_t)crocmem.again + d, 0, 1);
+                else
+                    used = 0;
             } else if (ui.page == PG_ARP) {  /* not part of the sound: saved, but it does not make My Croc */
                 uint8_t *v = k == 0 ? &set.arp : k == 1 ? &set.seq_gate : &set.arp_keep;
                 int32_t nv = clamp((int32_t)*v + d, 0, k == 0 ? 4 : k == 1 ? 4 : 1);
@@ -560,9 +592,13 @@ static void input(void)
         int8_t sn = seq_sounding, hn = crochop_sounding;
         uint32_t page_btn = ui.page == PG_HOME ? B_HOME : ui.page == PG_EDIT ? B_EDIT : ui.page == PG_ENV ? B_ENV
                             : ui.page == PG_LFO ? B_LFO : ui.page == PG_GLO ? B_GLO : ui.page == PG_FX ? B_FX
-                            : ui.page == PG_SEQ ? B_SEQ : ui.page == PG_SCALE ? B_SEL : ui.page == PG_ARP ? B_ARP : ui.soon;
-        swamp_lights(1u << page_btn | (seq.playing ? 1u << B_PLAY : 0u), keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u) |
-                                                                             (hn >= 53 && hn < 53 + NKEYS ? 1u << (hn - 53) : 0u));
+                            : ui.page == PG_SEQ ? B_SEQ : ui.page == PG_SCALE ? B_SEL : ui.page == PG_ARP ? B_ARP
+                            : ui.page == PG_REC ? B_REC : ui.soon;
+        uint8_t ms = crocmem_state;
+        ui.play_red = ms == CM_WAIT || ms == CM_LISTEN;      /* PLAY goes red while the croc listens */
+        swamp_lights(1u << page_btn | (seq.playing || ms != CM_QUIET ? 1u << B_PLAY : 0u),
+                     keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u) | (hn >= 53 && hn < 53 + NKEYS ? 1u << (hn - 53) : 0u) |
+                         (crocmem_keys & ((1u << NKEYS) - 1u)));
     }
 }
 
@@ -727,6 +763,77 @@ static void picture_scale(float t)
                     s_ellipse((float)x, 189.0f, 2.8f, 2.8f, home ? K_SUN : K_GLOW);
             }
         }
+    }
+    strip(KN, ui.focus);
+}
+
+/* croc remembers: the croc listening or singing, and the tune as dots (left to right in time, higher notes higher) */
+static void picture_mem(float t)
+{
+    static const char *const KN[4] = {"SPEED", "AGAIN", 0, 0};
+    static const char *const RATE[3] = {"SLOW", "THE SAME", "FAST"};
+    char buf[24];
+    const char *what, *now;
+    croc_t c;
+    uint32_t st = crocmem_state, n = crocmem_n, len = crocmem_len, pos = crocmem_pos, i, notes = 0;
+    if (n > CROCMEM_MAX)
+        n = CROCMEM_MAX;
+    for (i = 0; i < n; i++)
+        notes += cm_ev[i] >> 7;
+    scene(150);
+    t_center(120, 4, "CROC REMEMBERS", K_INK, 228, 1);
+    if (ui.focus == F_K1) {
+        what = "HOW FAST THE CROC SINGS IT";
+        now = RATE[crocmem.rate];
+    } else if (ui.focus == F_K2) {
+        what = "SING IT AGAIN AND AGAIN";
+        now = crocmem.again ? "YES" : "JUST ONCE";
+    } else if (st == CM_WAIT) {
+        what = "PLAY A TUNE ON THE KEYS";
+        now = "I AM LISTENING";
+    } else if (st == CM_LISTEN) {
+        what = "PRESS REC WHEN YOU ARE DONE";
+        num_text(buf, (int32_t)notes, "", notes == 1 ? " NOTE" : " NOTES");
+        now = buf;
+    } else if (st == CM_SING) {
+        what = "PRESS REC OR PLAY TO STOP";
+        now = "LA LA LA!";
+    } else if (n) {
+        what = "PLAY: HEAR IT AGAIN";
+        now = "REC: A NEW TUNE";
+    } else {
+        what = "PRESS REC, THEN PLAY A TUNE";
+        now = "NOTHING YET";
+    }
+    t_small(120, 30, what, K_INK);
+    t_center(120, 46, now, st == CM_WAIT || st == CM_LISTEN ? RGB(214, 60, 70) : K_CROCD, 220, 0);
+    croc_look(&c);
+    if (st == CM_SING)                       /* singing: the mouth opens for each note */
+        c.jaw = crocmem_keys ? 0.55f + 0.25f * fm_sinf(t * 18.0f) : 0.08f;
+    else if (st == CM_WAIT || st == CM_LISTEN)
+        c.jaw = 0.0f;                        /* listening: mouth shut, tail still */
+    else
+        c.jaw = 0.15f;
+    c.tail = st == CM_SING ? fm_sinf(t * 6.0f) * 0.3f : 0.0f;
+    croc_mid(140.0f, 0.82f, &c);
+    m_reset();
+    if (st == CM_WAIT || st == CM_LISTEN) {  /* a red light by its ear, blinking while it waits */
+        if (st == CM_LISTEN || ((uint32_t)(t * 3.0f) & 1u))
+            s_ellipse(206.0f, 96.0f, 7.0f, 7.0f, RGB(214, 60, 70));
+    }
+    label_box();
+    {                                        /* the tune: a dot a note; the bar is how much room is left, or where the
+                                              * singing is */
+        uint32_t span = st == CM_LISTEN ? CROCMEM_BLOCKS : len ? len : 1u;
+        if (st == CM_LISTEN)
+            span = pos < 860u ? 860u : pos + pos / 4u;       /* the picture grows with the tune (5 s at first) */
+        for (i = 0; i < n; i++) {
+            if (!(cm_ev[i] & 0x80u))
+                continue;
+            s_ellipse(24.0f + 192.0f * (float)cm_t[i] / (float)span, 207.0f - (float)((cm_ev[i] & 0x7F) - 53) * 1.15f, 2.6f, 2.6f, K_GLOW);
+        }
+        if (st == CM_LISTEN || st == CM_SING)
+            cv_rect(24 + (int32_t)(192u * (pos > span ? span : pos) / span), 174, 2, 36, st == CM_SING ? K_SUN : RGB(214, 60, 70));
     }
     strip(KN, ui.focus);
 }
@@ -1070,6 +1177,10 @@ static void picture(float t)
         picture_hops(t);
         return;
     }
+    if (ui.page == PG_REC) {
+        picture_mem(t);
+        return;
+    }
     if (ui.page == PG_FX) {
         static const char *const KN[4] = {"ECHO", "FAR", "CAVE", 0};
         static const char *const FAR[5] = {"VERY NEAR", "NEAR", "MIDDLE", "FAR", "VERY FAR"};
@@ -1243,6 +1354,16 @@ int app_expect(const char *what, int *got)
         *got = crochop_n;
     else if (!strcmp(what, "arpat"))
         *got = crochop_at;
+    else if (!strcmp(what, "memstate"))          /* 0 quiet, 1 waiting for a key, 2 listening, 3 singing */
+        *got = crocmem_state;
+    else if (!strcmp(what, "memn"))
+        *got = crocmem_n;
+    else if (!strcmp(what, "memlen"))
+        *got = crocmem_len;
+    else if (!strcmp(what, "memrate"))
+        *got = crocmem.rate;
+    else if (!strcmp(what, "memagain"))
+        *got = crocmem.again;
     else if (!strncmp(what, "pad", 3) && what[3] >= '0' && what[3] < '0' + SEQ_N && !what[4])   /* padN: pad N's note */
         *got = set.seq_note[what[3] - '0'];
     else if (!strcmp(what, "named"))

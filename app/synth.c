@@ -258,12 +258,140 @@ static uint8_t crochop_next(uint8_t n)
     }
 }
 
+/* ------------------------------------------------ croc remembers (REC) --- */
+/* The croc listens to the keys and sings the tune back. What is kept is each key going down and coming up, and when,
+ * counted in audio blocks (5.8 ms) from the first key. It is sung back through the voices as they are now, so the
+ * sound can be changed while it sings. Kept until the power goes off (not in the flash). */
+#define CROCMEM_MAX 240                  /* key-downs and key-ups: 120 notes */
+#define CROCMEM_BLOCKS 5168u             /* 30 s */
+enum { CM_QUIET, CM_WAIT, CM_LISTEN, CM_SING };   /* waiting: REC pressed, no key yet */
+enum { CM_DO_LISTEN = 1, CM_DO_SING_NOW, CM_DO_QUIET, CM_DO_SING };
+static struct {
+    volatile uint8_t cmd, cmd_n;         /* the main loop: what to do, and a count that changes with each ask */
+    volatile uint8_t rate;               /* 0 slow (half speed), 1 the same, 2 fast (double) */
+    volatile uint8_t again;              /* 1: sing it again and again */
+} crocmem;
+static volatile uint8_t crocmem_state;
+static volatile uint16_t crocmem_n, crocmem_len, crocmem_pos;   /* key moves kept; the tune's length and where the
+                                                                  * singing is, in blocks */
+static volatile uint32_t crocmem_keys;   /* the keys it is singing now, as bits (53 is bit 0): for the lights */
+static uint16_t cm_t[CROCMEM_MAX];       /* when, in blocks */
+static uint8_t cm_ev[CROCMEM_MAX];       /* the note, top bit set for a key going down */
+static uint8_t cm_seen;
+static uint32_t cm_clock, cm_fp, cm_i, cm_down;
+
+static void crocmem_hush(void)               /* let go of whatever it is singing */
+{
+    uint32_t m = crocmem_keys, k;
+    for (k = 0; k < 32u; k++)
+        if (m >> k & 1u)
+            note_off(53 + (int32_t)k);
+    crocmem_keys = 0;
+}
+static void crocmem_sing(void)
+{
+    crocmem_hush();
+    cm_fp = 0;
+    cm_i = 0;
+    crocmem_pos = 0;
+    crocmem_state = crocmem_n ? CM_SING : CM_QUIET;
+}
+static void crocmem_done(void)               /* the listening ends: close the notes still held, fix the length */
+{
+    uint32_t k, n = crocmem_n;
+    for (k = 0; k < 32u && n < CROCMEM_MAX; k++)
+        if (cm_down >> k & 1u) {
+            cm_t[n] = (uint16_t)cm_clock;
+            cm_ev[n] = (uint8_t)(53u + k);
+            n++;
+        }
+    cm_down = 0;
+    crocmem_n = (uint16_t)n;
+    crocmem_len = (uint16_t)(cm_clock ? cm_clock : 1u);
+}
+static void crocmem_hear(uint8_t b)          /* a key moved while it listens */
+{
+    uint32_t n = crocmem_n, bit = (uint32_t)(b & 0x7Fu) - 53u;
+    if (crocmem_state == CM_WAIT) {
+        if (!(b & 0x80u))
+            return;
+        crocmem_state = CM_LISTEN;       /* the first key: the tune starts here */
+        cm_clock = 0;
+    }
+    if (crocmem_state != CM_LISTEN || bit >= 32u)
+        return;
+    if (b & 0x80u ? n + 33u > CROCMEM_MAX : n >= CROCMEM_MAX)
+        return;                          /* full (a key going down leaves room for every key to come up) */
+    if (b & 0x80u)
+        cm_down |= 1u << bit;
+    else if (!(cm_down >> bit & 1u))
+        return;                          /* a key that went down before the listening began */
+    else
+        cm_down &= ~(1u << bit);
+    cm_t[n] = (uint16_t)cm_clock;
+    cm_ev[n] = b;
+    crocmem_n = (uint16_t)(n + 1u);
+}
+static void crocmem_tick(void)               /* audio interrupt, once a block, after the keys */
+{
+    if (crocmem.cmd_n != cm_seen) {
+        uint8_t c = crocmem.cmd;
+        cm_seen = crocmem.cmd_n;
+        if (c == CM_DO_LISTEN) {
+            crocmem_hush();
+            crocmem_n = 0;
+            crocmem_len = 0;
+            cm_down = 0;
+            crocmem_state = CM_WAIT;
+        } else if (c == CM_DO_SING_NOW || c == CM_DO_QUIET) {
+            if (crocmem_state == CM_LISTEN)
+                crocmem_done();
+            crocmem_hush();
+            crocmem_state = CM_QUIET;
+            if (c == CM_DO_SING_NOW)
+                crocmem_sing();
+        } else if (c == CM_DO_SING && crocmem_state == CM_QUIET) {
+            crocmem_sing();
+        }
+    }
+    if (crocmem_state == CM_LISTEN) {
+        if (++cm_clock >= CROCMEM_BLOCKS) {  /* half a minute: that is the tune */
+            crocmem_done();
+            crocmem_sing();
+        }
+        crocmem_pos = (uint16_t)cm_clock;
+    } else if (crocmem_state == CM_SING) {
+        uint32_t pos = cm_fp >> 8, n = crocmem_n;
+        while (cm_i < n && cm_t[cm_i] <= pos) {
+            uint8_t b = cm_ev[cm_i++];
+            uint32_t bit = (uint32_t)(b & 0x7Fu) - 53u;
+            if (b & 0x80u) {
+                note_on(b & 0x7F);
+                crocmem_keys |= 1u << bit;
+            } else {
+                note_off(b & 0x7F);
+                crocmem_keys &= ~(1u << bit);
+            }
+        }
+        cm_fp += crocmem.rate == 0 ? 128u : crocmem.rate == 2 ? 512u : 256u;
+        crocmem_pos = (uint16_t)pos;
+        if ((cm_fp >> 8) >= crocmem_len && cm_i >= n) {
+            crocmem_hush();
+            if (crocmem.again)
+                crocmem_sing();
+            else
+                crocmem_state = CM_QUIET;
+        }
+    }
+}
+
 static void key_events(void)
 {
     crochop_sync();
     while (ev_r != ev_w) {
         uint8_t b = evq[ev_r & 31u];
         ev_r++;
+        crocmem_hear(b);
         if (ch_way) {
             if (b & 0x80u)
                 crochop_add(b & 0x7F);
@@ -430,6 +558,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float dl_t = ECHO_SEC[s.echo_far] * SRATE, cave_t = (float)s.cave / 6.0f * 0.55f;
     midi_in();
     key_events();
+    crocmem_tick();
     if (n > APP_BLOCK)
         n = APP_BLOCK;
     if (!n)

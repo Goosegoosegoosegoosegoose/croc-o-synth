@@ -28,6 +28,7 @@ Open `prototype/index.html` in a browser. Tap the screen to wake the croc.
 | SEQ + PLAY | Lily pad steps | Eight-step sequencer |
 | SCL | Safe swamp | Scales: major, minor, harmonic minor, melodic minor, harmonic major, Dorian, Phrygian, Lydian, Mixolydian, Locrian, on any home note. The keys in the scale stay lit on every page |
 | ARP | Croc hops: way, hop, keep | Arpeggiator: direction, gate length, latch |
+| REC | Croc remembers: speed, again | A note recorder that loops: listen, sing back, half or double speed |
 | OCT- / OCT+ | Small croc, croc, big croc | Octave: three of them, all inside the speaker's range |
 | PRESETS knob | Surprise | Five sounds plus her own, kept as My Croc |
 | ALGORITHM knob | Jaws | Filter cutoff |
@@ -59,7 +60,7 @@ Each firmware build and what changed in it is listed in [CHANGELOG.md](CHANGELOG
 
 ## Not built yet
 
-- REC (croc remembers), SAVE
+- SAVE (everything saves itself, so this button has no job yet)
 - Challenges and stars for each lesson
 - Final croc and background art (the current drawing is a placeholder)
 

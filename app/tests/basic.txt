@@ -135,7 +135,7 @@ tap GLO
 wait 100
 expect page 5
 shot glo.png
-tap REC
+tap SAVE
 wait 100
 expect page 2
 shot soon.png

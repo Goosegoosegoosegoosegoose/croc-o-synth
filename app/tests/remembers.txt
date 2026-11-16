@@ -1,0 +1,119 @@
+# Croc remembers (REC) in the host simulator:
+#   app/build/host/crocosynth_host app/tests/remembers.txt app/build/host
+# page 10 is croc remembers. memstate: 0 quiet, 1 waiting for a key, 2 listening, 3 singing
+wait 3000
+tap HOME
+wait 100
+# echo and cave off, so the recordings are the notes alone
+tap FX
+turn K1 -9
+turn K3 -9
+# REC: the croc waits for the first key
+tap REC
+expect page 10
+expect memstate 1
+wait 400
+shot mem-wait.png
+# a tune: three notes, the second after a longer gap
+key 7 down
+wait 30
+expect memstate 2
+wait 170
+key 7 up
+wait 200
+key 11 down
+wait 200
+key 11 up
+wait 500
+key 14 down
+wait 200
+key 14 up
+wait 300
+expect memn 6
+shot mem-listen.png
+# REC again: it sings the tune back, again and again
+wav mem-sing.wav
+tap REC
+expect memstate 3
+wait 3300
+wavstop
+shot mem-sing.png
+expect memstate 3
+# while it sings, the sound can be changed and another page opened
+tap EDIT
+turn K1 1
+wait 300
+expect memstate 3
+# REC: quiet
+tap REC
+expect page 10
+expect memstate 0
+wait 700
+expect voices 0
+expect memn 6
+shot mem-kept.png
+# PLAY on this page: hear it again; PLAY again: stop
+tap PLAY
+expect memstate 3
+expect playing 0
+wait 300
+tap PLAY
+expect memstate 0
+wait 700
+expect voices 0
+# fast, and just once: it stops by itself
+turn K1 1
+expect memrate 2
+turn K2 -1
+expect memagain 0
+wait 100
+shot mem-knobs.png
+tap PLAY
+expect memstate 3
+wait 1500
+expect memstate 0
+wait 600
+expect voices 0
+# a held key when REC ends the listening is let go in the tune
+tap REC
+expect memstate 1
+key 19 down
+wait 300
+tap REC
+expect memstate 3
+expect memn 2
+key 19 up
+wait 1200
+expect memstate 0
+wait 500
+expect voices 0
+# REC with nothing played: back to quiet, and the old tune is gone
+tap REC
+expect memstate 1
+tap REC
+expect memstate 0
+expect memn 0
+# elsewhere PLAY is still the lily pads
+tap HOME
+tap PLAY
+expect playing 1
+expect memstate 0
+tap PLAY
+expect playing 0
+# a goodbye stops the singing
+tap REC
+key 7 down
+wait 200
+key 7 up
+wait 200
+turn K2 1
+tap REC
+expect memstate 3
+press HOME
+wait 1000
+expect mode 2
+release HOME
+wait 300
+expect memstate 0
+wait 700
+expect voices 0
