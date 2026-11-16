@@ -1,7 +1,7 @@
 # Croc-O-Synth in the host simulator: ./build.sh --host, then
 #   app/build/host/crocosynth_host app/tests/basic.txt app/build/host
 # modes: 0 greeting, 1 playing, 2 goodbye, 3 asleep, 4 naming. pages: 0 home, 1 teeth, 2 coming soon, 3 envelope,
-# 4 tail wag, 5 grown-ups, 6 swamp echo, 7 lily pads
+# 4 tail wag, 5 grown-ups, 6 swamp echo, 7 lily pads, 8 safe swamp (scales)
 wait 300
 expect mode 0
 shot boot.png
@@ -186,6 +186,76 @@ expect playing 0
 wait 600
 expect voices 0
 expect step -1
+# safe swamp (SCL): no scale at first, so no key glows and every key plays as it is
+tap SEL
+wait 100
+expect page 8
+expect scale 0
+expect litscale 0
+expect lithome 0
+expect keynote01 54
+shot scale-off.png
+# C major: the Cs half lit, the other white keys glowing
+turn K1 1
+expect scale 1
+expect litscale 94722645
+expect lithome 524416
+wait 100
+shot scale-major.png
+# D harmonic minor
+turn K1 2
+turn K2 2
+expect scale 3
+expect scalehome 2
+expect litscale 93542709
+expect lithome 2097664
+wait 100
+shot scale-dharm.png
+# a key outside the scale (F#): as it is, then it slides to F, then it stays quiet
+expect keynote01 54
+turn K3 1
+expect scaleother 1
+expect keynote01 53
+expect keynote00 53
+key 1 down
+wait 60
+expect voices 1
+key 1 up
+wait 100
+shot scale-others.png
+turn K3 1
+expect scaleother 2
+expect keynote01 -1
+key 1 down
+wait 60
+expect voices 0
+key 1 up
+key 0 down
+wait 60
+expect voices 1
+key 0 up
+turn K3 -1
+expect scaleother 1
+# the last scale, and the knob stops there
+turn K1 9
+expect scale 10
+turn K1 -7
+expect scale 3
+# the scale's lights stay on the other pages, and while the croc hops
+tap SEQ
+wait 100
+expect page 7
+expect litscale 93542709
+expect lithome 2097664
+leds
+tap PLAY
+wait 400
+expect litscale 93542709
+tap PLAY
+tap EDIT
+wait 100
+expect lithome 2097664
+wait 600
 # everything is kept across a power cycle
 tap HOME
 wait 3500
@@ -211,6 +281,10 @@ expect pad5 55
 expect pads 6
 expect hop 3
 expect tempo 6
+expect scale 3
+expect scalehome 2
+expect scaleother 1
+expect litscale 93542709
 expect playing 0
 shot home-after.png
 # GLO held: rename; HOME finishes
@@ -230,6 +304,7 @@ wait 300
 shot bye.png
 wait 5000
 expect mode 3
+leds
 tap PLAY
 wait 100
 expect mode 0

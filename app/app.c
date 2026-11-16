@@ -6,6 +6,7 @@
  *   FX         swamp echo, how far, the cave        PRESETS     five sounds and My Croc
  *   SEQ        lily pad steps: eight pads, a note on each     PLAY   the croc hops across them
  *   SELECT     hop speed                            ALGORITHM   the jaws, on every page
+ *   SCL        safe swamp: a scale, its home note; the keys in it stay lit on every page
  *   OCT- OCT+  big croc, croc, small croc           HOME held: goodbye      GLO held: name the croc
  * Part of the platform's unity build (base/device/unity.c, base/host/plat_host.c), after the platform: gfx.c and
  * announce.c are in scope. Written against the contract in app.h; see PROVENANCE.md for what came from where. */
@@ -14,7 +15,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 8"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 9"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -27,7 +28,8 @@ typedef struct {
     char name[NAME_LEN + 1];             /* the croc's name, A-Z and spaces; empty: not named yet */
     int8_t seq_note[SEQ_N];              /* the lily pads' notes (-1 empty) */
     uint8_t seq_pads, seq_gate, seq_tempo;
-    uint8_t scale, scale_home, scale_unsafe;   /* safe swamp (the scale mode): 0, 0, 0 is every key as it is */
+    uint8_t scale, scale_home, scale_unsafe;   /* safe swamp (the scale mode): 0 every key or 1..NSCALE; the home note
+                                              * 0..11 (C..B); the keys outside it 0 play too, 1 slide, 2 stay quiet */
     uint8_t arp;                         /* croc hops (the arpeggiator): 0 off */
     uint8_t rsv[15];                     /* room for more: take from here, so the record keeps its size */
 } settings_t;
@@ -75,6 +77,29 @@ static int name_ok(const char *n)
             return 0;
     return n[i] == 0;
 }
+
+/* ------------------------------------------------------- safe swamp (scales) --- */
+/* Each scale: the semitones above its home note, as bits (bit 0 the home note itself). The seven modes of the major
+ * scale (major is Ionian, minor is Aeolian), then the harmonic and melodic ones. */
+#define SWAMP_BITS(a, b, c, d, e, f, g) (uint16_t)(1u << a | 1u << b | 1u << c | 1u << d | 1u << e | 1u << f | 1u << g)
+#define NSCALE 10
+static const uint16_t SWAMP_SCALE[NSCALE] = {
+    SWAMP_BITS(0, 2, 4, 5, 7, 9, 11),    /* major (Ionian) */
+    SWAMP_BITS(0, 2, 3, 5, 7, 8, 10),    /* minor (Aeolian) */
+    SWAMP_BITS(0, 2, 3, 5, 7, 8, 11),    /* harmonic minor */
+    SWAMP_BITS(0, 2, 3, 5, 7, 9, 11),    /* melodic minor */
+    SWAMP_BITS(0, 2, 4, 5, 7, 8, 11),    /* harmonic major */
+    SWAMP_BITS(0, 2, 3, 5, 7, 9, 10),    /* Dorian */
+    SWAMP_BITS(0, 1, 3, 5, 7, 8, 10),    /* Phrygian */
+    SWAMP_BITS(0, 2, 4, 6, 7, 9, 11),    /* Lydian */
+    SWAMP_BITS(0, 2, 4, 5, 7, 9, 10),    /* Mixolydian */
+    SWAMP_BITS(0, 1, 3, 5, 6, 8, 10)};   /* Locrian */
+static const char *const SWAMP_NAME[NSCALE + 1] = {"EVERY KEY", "MAJOR", "MINOR", "HARMONIC MINOR", "MELODIC MINOR",
+                                                   "HARMONIC MAJOR", "DORIAN", "PHRYGIAN", "LYDIAN", "MIXOLYDIAN", "LOCRIAN"};
+static const char *const SWAMP_FEEL[NSCALE + 1] = {"TURN KNOB 1 TO PICK A SCALE", "HAPPY (IONIAN MODE)", "SAD (AEOLIAN MODE)",
+                                                   "SPOOKY", "MYSTERY", "SUNNY WITH ONE CLOUD", "COOL", "DESERT NIGHT",
+                                                   "DREAMY", "ROCKING", "WOBBLY"};
+static const char *const NOTE_NAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
 static const int8_t SEQ_FIRST[SEQ_N] = {60, 64, 67, 64, 60, 64, 67, 72};   /* a little tune to start from */
 
@@ -142,6 +167,8 @@ void app_init(void)
         set.seq_tempo = 3;
         set.scale = set.scale_home = set.scale_unsafe = set.arp = 0;
     }
+    if (set.scale > NSCALE || set.scale_home > 11 || set.scale_unsafe > 2)   /* only the scale is put back, not her sound */
+        set.scale = set.scale_home = set.scale_unsafe = 0;
     set.magic = SET_MAGIC;
     if (old)
         dirty_at = 1u;                       /* saved again in the new form */
@@ -151,7 +178,7 @@ void app_init(void)
 
 /* --------------------------------------------------------------------- UI --- */
 enum { M_BOOT, M_PLAY, M_BYE, M_OFF, M_NAME };
-enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ };
+enum { PG_HOME, PG_EDIT, PG_SOON, PG_ENV, PG_LFO, PG_GLO, PG_FX, PG_SEQ, PG_SCALE };
 enum { OV_NONE, OV_SIZE, OV_JAWS, OV_TEMPO };
 enum { F_NONE = -1, F_K1, F_K2, F_K3, F_K4 };   /* which of KNOB 1 to 4 was turned last on this page */
 
@@ -165,13 +192,53 @@ static struct {
     uint8_t letter[NAME_LEN];            /* the name being spelled: 0 a space, 1..26 A..Z */
     uint8_t ncur;
     uint8_t seq_cur;                     /* the lily pad a key plants its note on */
+    uint32_t lit_scale, lit_home;        /* the keys glowing for the scale, and its home notes (brighter) */
 } ui;
 
-static const char *const SOON_NAME[NB] = {"", "SAFE SWAMP", "", "", "", "", "", "SAVE", "CROC HOPS",
+static const char *const SOON_NAME[NB] = {"", "", "", "", "", "", "", "SAVE", "CROC HOPS",
                                           "", "", "CROC REMEMBERS", "", ""};
 
-/* The note a key plays: key 0 is F3 (MIDI 53). -1: the key stays silent. Safe swamp (the scale mode) changes this. */
-static int32_t key_to_note(uint32_t k) { return 53 + (int32_t)k; }
+/* is this note in the scale that is set? (every note is, with no scale) */
+static int swamp_has(int32_t note)
+{
+    return !set.scale || (SWAMP_SCALE[set.scale - 1] >> ((note - (int32_t)set.scale_home + 120) % 12) & 1u);
+}
+/* The note a key plays: key 0 is F3 (MIDI 53). -1: the key stays silent. With a scale set, a key outside it plays as
+ * it is, slides to the nearest key in the scale (the lower one when two are as near; never off the keyboard), or
+ * stays quiet. */
+static int32_t key_to_note(uint32_t k)
+{
+    int32_t n = 53 + (int32_t)k, d;
+    if (!set.scale_unsafe || swamp_has(n))
+        return n;
+    if (set.scale_unsafe == 2)
+        return -1;
+    for (d = 1; d < 12; d++) {
+        if (n - d >= 53 && swamp_has(n - d))
+            return n - d;
+        if (n + d < 53 + NKEYS && swamp_has(n + d))
+            return n + d;
+    }
+    return n;
+}
+/* The lights. Buttons: lit, the rest glowing (PLAY green), SCL half lit while a scale is set. Keys: lit, the scale's
+ * home notes half lit, its other notes glowing. The scale's lights stay on whatever page is up. */
+static void swamp_lights(uint32_t buttons, uint32_t keys)
+{
+    uint32_t play = 1u << B_PLAY, all = (1u << NB) - 1u, b = buttons & all, dim = all & ~b, k, sc = 0, home = 0;
+    for (k = 0; k < NKEYS && set.scale; k++) {
+        if ((53 + k - set.scale_home) % 12u == 0)
+            home |= 1u << k;
+        else if (swamp_has(53 + (int32_t)k))
+            sc |= 1u << k;
+    }
+    ui.lit_scale = sc;
+    ui.lit_home = home;
+    b = (b & ~play) | (b & play ? LED_PLAY_GREEN : 0u);
+    dim = (dim & ~play) | (dim & play ? LED_PLAY_GREEN : 0u);
+    plat_lights(b, keys, dim, sc, 2);
+    plat_lights_mid(set.scale ? 1u << B_SEL : 0u, home);
+}
 
 void app_say(const char *a, const char *b)
 {
@@ -292,6 +359,7 @@ static void input(void)
         ui.btn = btn;
         plat_glow(1);
         plat_leds(1u << B_HOME, 0);
+        plat_lights_mid(0, 0);               /* the scale's lights are for playing only */
         if (btn_dn >> B_HOME & 1u)
             naming_done();
         return;
@@ -311,6 +379,7 @@ static void input(void)
         ui.keys = keys;
         ui.btn = btn;
         plat_leds(0, 0);
+        plat_lights_mid(0, 0);
         return;
     }
     for (k = 0; k < NKEYS; k++) {
@@ -353,6 +422,8 @@ static void input(void)
             go_page(PG_FX);
         } else if (k == B_SEQ) {
             go_page(PG_SEQ);
+        } else if (k == B_SEL) {
+            go_page(PG_SCALE);
         } else if (k == B_PLAY) {            /* the croc hops, or stops, whatever page is up */
             seq.playing = !seq.playing;
         } else if (k == B_GLO) {
@@ -431,6 +502,15 @@ static void input(void)
                     set.seq_note[ui.seq_cur] = -1;
                     seq_changed();
                 }
+            } else if (ui.page == PG_SCALE) {    /* the scale is the instrument's, not the sound's: no My Croc */
+                uint8_t *v = k == 0 ? &set.scale : k == 1 ? &set.scale_home : &set.scale_unsafe;
+                int32_t n = clamp((int32_t)*v + d, 0, k == 0 ? NSCALE : k == 1 ? 11 : 2);
+                if (k == 3) {
+                    used = 0;
+                } else if (n != *v) {
+                    *v = (uint8_t)n;
+                    touched();
+                }
             } else if (ui.page == PG_FX) {
                 if (k == 0)
                     step(&snd.echo, d, 0, 6);
@@ -476,8 +556,8 @@ static void input(void)
         int8_t sn = seq_sounding;
         uint32_t page_btn = ui.page == PG_HOME ? B_HOME : ui.page == PG_EDIT ? B_EDIT : ui.page == PG_ENV ? B_ENV
                             : ui.page == PG_LFO ? B_LFO : ui.page == PG_GLO ? B_GLO : ui.page == PG_FX ? B_FX
-                            : ui.page == PG_SEQ ? B_SEQ : ui.soon;
-        plat_leds(1u << page_btn | (seq.playing ? 1u << B_PLAY : 0u), keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u));
+                            : ui.page == PG_SEQ ? B_SEQ : ui.page == PG_SCALE ? B_SEL : ui.soon;
+        swamp_lights(1u << page_btn | (seq.playing ? 1u << B_PLAY : 0u), keys | (sn >= 53 && sn < 53 + NKEYS ? 1u << (sn - 53) : 0u));
     }
 }
 
@@ -534,7 +614,6 @@ static void num_text(char *b, int32_t v, const char *before, const char *after) 
 static void picture_seq(float t)
 {
     static const char *const KN[4] = {"PAD", "HOW MANY", "HOP", "EMPTY"};
-    static const char *const NOTE[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
     static const char *const HOPS[5] = {"TINY HOPS", "SHORT HOPS", "HOPS", "LONG HOPS", "SLIDING"};
     char buf[24];
     const char *what, *now;
@@ -574,7 +653,7 @@ static void picture_seq(float t)
         s_ellipse(px, py, 23.0f, 13.0f, !on ? RGB(98, 186, 196) : hot ? RGB(155, 232, 115) : RGB(79, 174, 69));
         s_tri(px + 4.0f, py, px + 25.0f, py - 6.5f, px + 25.0f, py + 6.5f, K_WATER);
         if (on && set.seq_note[i] >= 0) {
-            const char *nm = NOTE[set.seq_note[i] % 12];
+            const char *nm = NOTE_NAME[set.seq_note[i] % 12];
             cv_text((int32_t)px - 6 - text_w(&FONT_B, nm) / 2, (int32_t)py - 8, &FONT_B, nm, RGB(13, 51, 25));
         }
         if (hot) {
@@ -591,6 +670,62 @@ static void picture_seq(float t)
     } else {                                 /* waiting on the first pad */
         c.sleep = 1;
         croc_draw(44.0f, 91.0f, 0.3f, &c);
+    }
+    strip(KN, ui.focus);
+}
+
+/* safe swamp: the scale's name, the croc, and the keyboard with a dot on every key in the scale, as the keys' lights
+ * show it (the home notes yellow) */
+static void picture_scale(float t)
+{
+    static const char *const KN[4] = {"SCALE", "HOME", "OTHERS", 0};
+    static const char *const OTHER[3] = {"THEY PLAY TOO", "THEY SLIDE TO A LIT KEY", "THEY STAY QUIET"};
+    static const uint8_t BLACK[12] = {0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0};
+    char buf[24];
+    const char *what, *now;
+    croc_t c;
+    int32_t k, w = 0, pass;
+    scene(150);
+    t_center(120, 4, SWAMP_NAME[set.scale], K_INK, 228, 2);
+    if (ui.focus == F_K2) {
+        what = "THE HOME NOTE: WHERE THE SCALE STARTS";
+        text_join(buf, "HOME IS ", NOTE_NAME[set.scale_home], "");
+        now = buf;
+    } else if (ui.focus == F_K3) {
+        what = "THE KEYS THAT ARE NOT LIT";
+        now = set.scale ? OTHER[set.scale_unsafe] : "PICK A SCALE FIRST";
+    } else {
+        what = set.scale ? "THE LIT KEYS ARE IN THIS SCALE" : "A SCALE LIGHTS UP ITS KEYS";
+        now = SWAMP_FEEL[set.scale];
+    }
+    t_small(120, 38, what, K_INK);
+    t_center(120, 54, now, K_CROCD, 224, 0);
+    croc_look(&c);
+    c.jaw = ui.keys ? 0.6f : 0.15f;
+    c.tail = fm_sinf(t * 3.0f) * 0.2f;
+    croc_mid(144.0f, 0.78f, &c);
+    label_box();
+    for (pass = 0; pass < 2; pass++) {       /* the white keys, then the black ones over them: F3 .. G5 */
+        w = 0;
+        for (k = 0; k < NKEYS; k++) {
+            int32_t n = 53 + k, bl = BLACK[n % 12], x = 24 + w * 12, held = (int32_t)(ui.keys >> k & 1u);
+            int32_t home = set.scale && (n - (int32_t)set.scale_home) % 12 == 0, in = set.scale && swamp_has(n);
+            if (!bl)
+                w++;
+            if (bl != pass)
+                continue;
+            if (!bl) {
+                cv_rect(x, 175, 11, 34, held ? K_MOUTH : K_TOOTH);
+                if (in)
+                    s_ellipse((float)x + 5.5f, 202.0f, 3.6f, 3.6f, home ? K_SUN : K_CROCD);
+                if (home)
+                    s_ellipse((float)x + 5.5f, 202.0f, 1.6f, 1.6f, K_INK);
+            } else {
+                cv_rect(x - 4, 175, 8, 20, held ? K_MOUTH : K_OFF);
+                if (in)
+                    s_ellipse((float)x, 189.0f, 2.8f, 2.8f, home ? K_SUN : K_GLOW);
+            }
+        }
     }
     strip(KN, ui.focus);
 }
@@ -863,6 +998,10 @@ static void picture(float t)
         picture_seq(t);
         return;
     }
+    if (ui.page == PG_SCALE) {
+        picture_scale(t);
+        return;
+    }
     if (ui.page == PG_FX) {
         static const char *const KN[4] = {"ECHO", "FAR", "CAVE", 0};
         static const char *const FAR[5] = {"VERY NEAR", "NEAR", "MIDDLE", "FAR", "VERY FAR"};
@@ -1016,6 +1155,18 @@ int app_expect(const char *what, int *got)
         *got = set.seq_gate;
     else if (!strcmp(what, "tempo"))
         *got = set.seq_tempo;
+    else if (!strcmp(what, "scale"))
+        *got = set.scale;
+    else if (!strcmp(what, "scalehome"))
+        *got = set.scale_home;
+    else if (!strcmp(what, "scaleother"))
+        *got = set.scale_unsafe;
+    else if (!strcmp(what, "litscale"))          /* the keys glowing for the scale, as bits (key 0 is bit 0) */
+        *got = (int)ui.lit_scale;
+    else if (!strcmp(what, "lithome"))
+        *got = (int)ui.lit_home;
+    else if (!strncmp(what, "keynote", 7))       /* keynoteK: the note key K (two digits) plays now */
+        *got = (int)key_to_note((uint32_t)((what[7] - '0') * 10 + (what[8] - '0')));
     else if (!strncmp(what, "pad", 3) && what[3] >= '0' && what[3] < '0' + SEQ_N && !what[4])   /* padN: pad N's note */
         *got = set.seq_note[what[3] - '0'];
     else if (!strcmp(what, "named"))
