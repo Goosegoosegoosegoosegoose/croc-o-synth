@@ -21,7 +21,7 @@ Builds 1 to 8 are dated 2026-11-15; builds 9 to 11 are 2026-11-16.
 - **Checked:** simulator checks pass, with a new script. Read back from a recording: three notes played at 0, 0.40 and 1.10 s came back at 0, 0.39 and 1.09 s, and the tune came round again every 1.60 s.
 - **Not checked:** the red PLAY light. The simulator has no colours; on the device it relies on PLAY's first light being the red one.
 - **Not done:** the browser prototype still shows "coming soon" for REC.
-- **On the FM-1:** not reported yet.
+- **On the FM-1:** installed. Looks great; no issues found so far, with more testing still to come.
 
 ## Build 10: croc hops
 
