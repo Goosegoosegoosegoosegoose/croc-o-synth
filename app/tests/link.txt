@@ -81,7 +81,7 @@ midi USB 80 3C 00
 # hello: who it is, then everything again
 sysex F0 7D 43 52 01 F7
 wait 50
-expect_sysex F0 7D 43 52 02 01 0D 43 52 4F 43 00 00 00 00 F7
+expect_sysex F0 7D 43 52 02 01 0E 43 52 4F 43 00 00 00 00 F7
 expect_out USB B0 0E 05
 expect_out USB B0 6E 00
 out
@@ -93,7 +93,7 @@ expect name0 90
 expect name1 73
 expect name2 71
 expect name3 0
-expect_sysex F0 7D 43 52 02 01 0D 5A 49 47 00 00 00 00 00 F7
+expect_sysex F0 7D 43 52 02 01 0E 5A 49 47 00 00 00 00 00 F7
 # not a croc's name: nothing changes
 sysex F0 7D 43 52 03 31 32 F7
 wait 50
