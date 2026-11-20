@@ -37,6 +37,10 @@ Open `prototype/index.html` in a browser. Tap the screen to wake the croc.
 
 Screens: "Been awhile, croco-dial!" on start-up, "See you later, oscillator!" on goodbye, and a name-your-croc screen on first power-on.
 
+## On a bigger screen: the iPad app
+
+From build 14 the FM-1 tells an editor every setting over USB-MIDI and takes them back. `companion/Synth Companion.swiftpm` is an iPad app (made in Swift Playgrounds, works offline) with every setting on one page: plug the FM-1 into the iPad with a USB-C cable and they follow each other. How to put it on the iPad: [companion/README.md](companion/README.md). The MIDI map, for any other editor or controller: [docs/MIDI.md](docs/MIDI.md).
+
 ## Build the firmware
 
     git clone --recursive https://github.com/Goosegoosegoosegoosegoose/croc-o-synth
@@ -53,6 +57,8 @@ The simulator runs a script of presses and turns and writes screenshots and audi
 | `app/app.c` | The screens and the controls |
 | `app/synth.c` | The sound: up to four notes, one to three oscillators each, envelope, filter |
 | `app/draw.c` | Shapes, text and the placeholder croc |
+| `app/link.c` | Every setting as a MIDI CC, both ways, for an editor |
+| `companion/` | The iPad editor (Swift Playgrounds) |
 | `app/platglue.c`, `app/app.h`, `app/fm1.toml`, `app/words.tsv` | Adapted from fm1-base's template (MPL-2.0) |
 | `base/` | fm1-base, a git submodule (MPL-2.0) |
 

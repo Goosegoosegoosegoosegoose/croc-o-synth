@@ -15,7 +15,7 @@
 #include "platglue.c"
 #include "draw.c"
 
-#define CROC_BUILD "BUILD 13"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
+#define CROC_BUILD "BUILD 14"             /* on the greeting: which build is in this FM-1 (CHANGELOG.md) */
 
 /* --------------------------------------------------------------- settings --- */
 #define NAME_LEN 8
@@ -394,6 +394,8 @@ static void naming_done(void)
     go_page(PG_HOME);
     set_mode(M_PLAY);
 }
+
+#include "link.c"                       /* the croc link: every setting as a MIDI CC, for an editor */
 
 static void input(void)
 {
@@ -1492,6 +1494,7 @@ void app_frame(void)
 {
     uint32_t now = plat_ms();
     input();
+    link_frame();
     ann_tick(now);
     phones_in = plat_headphones() == 1;      /* the speaker gets no deep bass; headphones do */
     if (ui.mode == M_BOOT && now - ui.t0 > 2600u) {

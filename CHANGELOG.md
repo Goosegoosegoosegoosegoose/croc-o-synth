@@ -4,7 +4,21 @@ Every firmware build, newest first: what changed, what was checked, and what hap
 
 All of these are development builds, so the FM-1 reports the same identity for each (`FM-1_5800`). The commit is what tells them apart.
 
-Builds 1 to 8 are dated 2026-11-15; builds 9 to 13 are 2026-11-16.
+Builds 1 to 8 are dated 2026-11-15; builds 9 to 13 are 2026-11-16; build 14 is 2026-11-20.
+
+## Build 14: the croc link (MIDI editor)
+
+- Commit: the one that adds this entry. Download: double-click `update-croc.bat`, or the **latest** release.
+- **Added:** every setting over USB-MIDI, both ways (`app/link.c`, the map in [docs/MIDI.md](docs/MIDI.md)). Each setting has a CC: the sound (14..29), the lily pads, hops, scale and play (102..118), and the pad the croc is on (119, out only).
+  - turning a knob, picking a preset or anything else that changes a setting sends its CC, so an editor always matches the FM-1
+  - a CC from an editor sets the setting as the knob would (a sound setting makes My Croc) and is saved the same way
+  - a SysEx hello (`F0 7D 43 52 01 F7`) gets the croc's name and build back, then every CC; another SysEx renames the croc
+  - every CC is sent again whenever a computer or iPad connects
+- **Added:** the iPad companion app, `companion/Synth Companion.swiftpm`, for Swift Playgrounds: every setting on one page, the keys, the lily pads. See [companion/README.md](companion/README.md).
+- **Changed:** nothing on the FM-1's own screens or sound.
+- **Checked:** simulator checks pass, with a new script (`app/tests/link.txt`): CCs in and out, a value kept in range and sent back, no echo of the editor's own values, a preset sending its settings, PLAY both ways, the playhead, the hello and the rename, everything again after the cable goes out and in, and the changes kept through a power cycle.
+- **Not checked:** the iPad app has not been compiled (no Apple tools in the sandbox) or run with a real FM-1: the first try in Swift Playgrounds may show errors to fix.
+- **On the FM-1:** not installed yet.
 
 ## Web app (no new firmware build)
 

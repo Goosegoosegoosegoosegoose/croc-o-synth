@@ -52,7 +52,8 @@ Follow an existing one; the tail wag lesson (`PG_LFO`) is the fullest example.
 6. **Its sound**: fields in `sound_t` (`synth.c`), read in `app_render`. Anything that changes while a note sounds must glide or fade, never jump.
 7. **Tests**: add to `app/tests/basic.txt` (screens and settings) and `sound.txt` (recordings).
 8. **Prototype**: keep `prototype/index.html` in step when the design changes.
-9. **Build number and changelog**: bump `CROC_BUILD` in `app.c` and add an entry at the top of `CHANGELOG.md`.
+9. **The croc link**: a new setting that matters to an editor gets a CC in `app/link.c` (`LINK_CC`, `link_value`, `link_set`), a row in `docs/MIDI.md`, and a `Param` in `companion/Synth Companion.swiftpm/CrocOSynth.swift`.
+10. **Build number and changelog**: bump `CROC_BUILD` in `app.c` and add an entry at the top of `CHANGELOG.md`.
 
 ### Saved settings
 
@@ -87,6 +88,7 @@ Each key and button has one light with brightness only (`plat_leds`, `plat_light
 | Croc hops, the arpeggiator (ARP) | `main` | Done: build 10 (not seen on a real FM-1 yet) |
 | Croc remembers (REC) | `main` | Done: build 11 (not seen on a real FM-1 yet) |
 | SAVE, challenges and stars | done (build 12) | list `CHAL[]` and checks `chal_done()` in `app/app.c`; a new challenge needs a row in each, and stars are 16 bits |
+| The croc link (MIDI CCs for an editor) and the iPad app | `link` branch | Build 14: simulator checks pass; the app not yet compiled or tried with the FM-1 |
 | The croc and background art | the owner | In progress |
 
 ### Notes for the two lessons

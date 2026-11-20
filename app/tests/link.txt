@@ -1,0 +1,114 @@
+# The croc link (app/link.c, docs/MIDI.md): every setting as a CC both ways, the SysEx hello and name.
+#   app/build/host/crocosynth_host app/tests/link.txt app/build/host
+wait 300
+# a fresh FM-1 tells a connected editor everything at once: the preset (Baby Croc) and its teeth
+expect_out USB B0 0E 00
+expect_out USB B0 0F 00
+expect_out USB B0 66 03
+out
+# first power-on: an unnamed croc becomes CROC
+wait 2800
+tap HOME
+expect mode 1
+wait 50
+out
+# the editor opens the jaws: the FM-1 takes it, does not say it back, and the sound is now My Croc (preset 5)
+midi USB B0 13 05
+wait 50
+expect jaws 5
+expect preset 5
+expect_out USB B0 0E 05
+expect_no_out USB B0 13 05
+out
+# too far: kept in range, and the editor is told where it really is
+midi USB B0 13 40
+wait 50
+expect jaws 12
+expect_out USB B0 13 0C
+out
+# the ALGORITHM knob on the FM-1: the editor hears it
+turn ALGO -2
+wait 50
+expect jaws 10
+expect_out USB B0 13 0A
+out
+# the editor picks Swamp Bass: its settings all come back
+midi USB B0 0E 01
+wait 50
+expect preset 1
+expect teeth 2
+expect_out USB B0 0F 02
+expect_out USB B0 10 02
+expect_no_out USB B0 0E 01
+out
+# small croc, from any channel (a sound change: My Croc again)
+midi USB B3 12 00
+wait 50
+expect size -1
+# a lily pad's note, then emptied; the hop speed; the scale
+midi USB B0 6F 3C
+wait 50
+expect pad0 60
+midi USB B0 6F 00
+wait 50
+expect pad0 -1
+midi USB B0 66 07
+midi USB B0 6C 02
+midi USB B0 6D 09
+wait 50
+expect tempo 7
+expect scale 2
+expect scalehome 9
+# PLAY from the editor, and PLAY on the FM-1 heard back
+midi USB B0 6E 01
+wait 50
+expect playing 1
+# the editor sees the croc hop onto a pad
+wait 600
+expect_out USB B0 77 01
+out
+tap PLAY
+wait 50
+expect playing 0
+expect_out USB B0 6E 00
+expect_out USB B0 77 00
+out
+# notes still work both ways
+midi USB 90 3C 64
+wait 30
+expect voices 1
+midi USB 80 3C 00
+# hello: who it is, then everything again
+sysex F0 7D 43 52 01 F7
+wait 50
+expect_sysex F0 7D 43 52 02 01 0D 43 52 4F 43 00 00 00 00 F7
+expect_out USB B0 0E 05
+expect_out USB B0 6E 00
+out
+sysex_out
+# the editor names the croc
+sysex F0 7D 43 52 03 7A 69 67 F7
+wait 50
+expect name0 90
+expect name1 73
+expect name2 71
+expect name3 0
+expect_sysex F0 7D 43 52 02 01 0D 5A 49 47 00 00 00 00 00 F7
+# not a croc's name: nothing changes
+sysex F0 7D 43 52 03 31 32 F7
+wait 50
+expect name0 90
+# the cable out and in: everything again
+out
+usb unplug
+wait 50
+usb plug
+wait 50
+expect_out USB B0 13 04
+# kept after a power-off, as a knob's change is
+wait 4000
+reboot
+wait 300
+expect preset 5
+expect size -1
+expect name0 90

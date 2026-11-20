@@ -4,6 +4,8 @@
  * message display and velocity) and the note messages its key scan sends (as one helper, USB only, a fixed
  * velocity). Kept in this file so the lines that came from the template stay under its licence (see PROVENANCE.md). */
 
+static void link_cc_in(uint32_t cc, uint32_t v);   /* link.c (Croc-O-Synth's own): a CC for the editor link */
+
 static void midi_in(void)                    /* audio interrupt: the packets that came in */
 {
     uint32_t pkt;
@@ -14,6 +16,8 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
             note_on((int32_t)d1);
         else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u)
             note_off((int32_t)d1);
+        else if ((st & 0xF0u) == 0xB0u)
+            link_cc_in(d1, d2);
     }
 }
 

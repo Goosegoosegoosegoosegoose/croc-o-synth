@@ -25,5 +25,9 @@ void app_input_only(void);               /* between frames: input only */
 void app_say(const char *a, const char *b);   /* a short message to a screen reader */
 
 /* the host simulator's checks (base/host/plat_host.c "expect"): mode, page, teeth, rows, crook, size, jaws, voices */
+/* SysEx from the computer: the croc link's hello and name (app/link.c) */
+#define APP_SYSEX
+int app_sysex(const uint8_t *p, uint32_t n);
+
 #define APP_HOST_EXPECT
 int app_expect(const char *what, int *got);
